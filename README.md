@@ -77,7 +77,7 @@ If it reports a missing `_tkinter`, use a Python installation that includes Tk
 (for example, a Conda environment with `python=3.11 tk`).
 
 ```sh
-git clone https://github.com/ChriCheng/Texo.git
+git clone --branch codex/macos-local-ocr https://github.com/ChriCheng/Texo.git
 cd Texo
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-macos.txt

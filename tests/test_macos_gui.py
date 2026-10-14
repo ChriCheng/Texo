@@ -40,6 +40,34 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(window.copy_button.cget("state"), "normal")
             window.copy_button.invoke()
             self.assertEqual(root.clipboard_get(), latex)
+            window.output.insert("end", "\n")
+            for label, delimiter in (("LaTeX", ""), ("$LaTeX$", "$"), ("$$LaTeX$$", "$$")):
+                window.copy_format.set(label)
+                window.copy_button.invoke()
+                self.assertEqual(root.clipboard_get(), f"{delimiter}{latex}{delimiter}")
+            with Image.open(ROOT / "tests/fixtures/simple.png") as fixture:
+                with patch("PIL.ImageGrab.grabclipboard", return_value=fixture):
+                    window.clipboard_button.invoke()
+                    deadline = time.monotonic() + 30
+                    while window.busy:
+                        root.update()
+                        if time.monotonic() > deadline:
+                            self.fail("clipboard OCR did not finish")
+                        time.sleep(0.01)
+            self.assertEqual(window.output.get("1.0", "end-1c"), latex)
+            from subprocess import CompletedProcess
+
+            with patch("subprocess.run", return_value=CompletedProcess([], 1, b"", b"")):
+                window.capture_button.invoke()
+                deadline = time.monotonic() + 5
+                while window.busy:
+                    root.update()
+                    if time.monotonic() > deadline:
+                        self.fail("cancelled capture did not restore the window")
+                    time.sleep(0.01)
+            self.assertTrue(root.winfo_viewable())
+            self.assertIn("已取消截图", window.status.get())
+            self.assertEqual(window.output.get("1.0", "end-1c"), latex)
             choose_and_wait(ROOT / "tests/fixtures/does-not-exist.png")
             self.assertIn("无法打开图片", window.status.get())
             self.assertEqual(window.copy_button.cget("state"), "disabled")

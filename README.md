@@ -66,10 +66,10 @@ We only list the lightweight version for the SOTA models, as we can see in terms
 
 ### macOS local OCR (no training)
 
-This fork includes a desktop window for selecting a formula image and copying
-the recognized LaTeX. Inference runs on CPU and uses the existing Texo model and
-image processor. Images stay on your Mac; model downloads are needed only during
-setup.
+This fork includes a desktop window for selecting an image, recognizing a
+clipboard image, or capturing a temporary screen region with global **Command-L**.
+Inference runs on CPU and uses the existing Texo model and image processor.
+Images stay on your Mac; model downloads are needed only during setup.
 
 Use Python 3.11 or 3.12 with Tk support. Check your interpreter first:
 `python3 -c 'import tkinter; print(tkinter.TkVersion)'`.
@@ -85,8 +85,28 @@ python3 -m venv .venv
 ./launch_macos.command
 ```
 
-After setup, double-click `launch_macos.command` in Finder, select an image, and
-click **复制 LaTeX** to copy the result. You can also recognize a file directly:
+After setup, double-click `launch_macos.command` in Finder. Choose an input:
+
+- **选择图片** opens a saved formula image.
+- **识别剪贴板** recognizes image data on the clipboard. On macOS,
+  **Command-Control-Shift-4** captures a selected region to the clipboard.
+- **截图识别 ⌘L** captures a region directly. Global **Command-L** triggers the
+  same capture while another app is in front. Texo must remain running; this
+  takes precedence over other apps' Command-L action. Close Texo to release it.
+  A shortcut registration conflict is shown in the status line.
+
+Press **Esc** to cancel a capture and keep the previous result. Temporary
+screenshots are deleted after loading. If macOS blocks screen capture, allow
+screen recording for the application that starts Texo in System Settings.
+
+Select **LaTeX**, **$LaTeX$**, or **$$LaTeX$$** in the format menu, then click
+**复制 LaTeX**. These copy plain source, inline math, or display math respectively,
+with no trailing newline. You can edit the result before copying. The CLI also
+omits the trailing newline.
+
+Texo's verified KaTeX aliases `\larr` and `\infin` are converted to the equivalent
+`\leftarrow` and `\infty` commands for Obsidian/MathJax. Cropped-away formula
+content is not reconstructed. You can also recognize a file directly:
 
 ```sh
 .venv/bin/python main.py path/to/formula.png

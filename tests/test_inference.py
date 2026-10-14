@@ -20,6 +20,10 @@ class InferenceTests(unittest.TestCase):
         path = ROOT / "tests/fixtures/simple.png"
         expected = "x^{2}+y^{2}=z^{2}"
         self.assertEqual("".join(recognize(path).split()), expected)
+        with Image.open(path) as source:
+            pixel = source.getpixel((0, 0))
+            self.assertEqual("".join(recognize(source).split()), expected)
+            self.assertEqual(source.getpixel((0, 0)), pixel)
         with tempfile.TemporaryDirectory() as directory:
             transparent_path = Path(directory) / "transparent.png"
             with Image.open(path) as source:

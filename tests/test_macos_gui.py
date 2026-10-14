@@ -95,6 +95,17 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(str(window.copy_format_menu.cget("state")), "readonly")
             window.copy_button.invoke()
             self.assertEqual(root.clipboard_get(), f"$${latex}$$")
+            root.withdraw()
+            root.tk.call("::tk::mac::ReopenApplication")
+            root.update()
+            self.assertTrue(root.winfo_viewable())
+            window.set_busy(True)
+            root.withdraw()
+            root.tk.call("::tk::mac::ReopenApplication")
+            root.update()
+            self.assertFalse(root.winfo_viewable())
+            window.set_busy(False)
+            root.deiconify()
         finally:
             root.clipboard_clear()
             if previous_clipboard is not None:

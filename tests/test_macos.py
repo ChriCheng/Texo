@@ -60,6 +60,15 @@ class CaptureTests(unittest.TestCase):
                 capture_image()
         run.assert_not_called()
 
+    def test_app_capture_requests_permission_and_identifies_texo(self):
+        from texo.macos import capture_image
+
+        with patch.dict(os.environ, {"TEXO_APP_BUNDLE": "/Applications/Texo.app"}), patch("texo.macos.screen_capture_allowed", return_value=False), patch("ctypes.CDLL") as library, patch("subprocess.run") as run:
+            with self.assertRaisesRegex(RuntimeError, "允许 Texo"):
+                capture_image()
+        library.return_value.CGRequestScreenCaptureAccess.assert_called_once_with()
+        run.assert_not_called()
+
     def test_capture_reads_image_and_removes_temporary_file(self):
         from texo.macos import capture_image
 

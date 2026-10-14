@@ -92,7 +92,33 @@ python3 -m venv .venv
 ./launch_macos.command
 ```
 
-After setup, double-click `launch_macos.command` in Finder. Choose an input:
+After setup, use the application below or double-click `launch_macos.command`.
+
+For a local **Texo.app** that opens from Spotlight or Finder without a terminal:
+
+```sh
+.venv/bin/python scripts/python/build_macos_app.py --output /Applications/Texo.app
+open /Applications/Texo.app
+```
+
+If `/Applications` is not writable, use `--output ~/Applications/Texo.app`.
+After installation, press **Command-Space**, search **Texo** and press Return.
+Opening it again raises the existing window. **Command-Q**, the Dock Quit action
+or closing the window exits Texo and releases global Command-L.
+
+This is a small application for the current Mac: it embeds the existing Python
+runtime in the app process and reuses this checkout's `.venv`, model files and
+base Python installation. Keep those locations in place; rebuild the app if
+the project moves. It is not a standalone package for another computer.
+Startup diagnostics are appended to `.local/texo-app.log` in the project.
+
+The application has its own macOS screen-recording identity. On the first
+capture, allow **Texo** in System Settings → Privacy & Security → Screen
+Recording, then fully quit and reopen it. The previous terminal's authorization
+does not authorize the application. Locally rebuilding the native launcher may
+require authorizing it again. Models and user images remain local.
+
+Choose an input in either the app or terminal-launched window:
 
 - **选择图片** opens a saved text or formula image.
 - **识别剪贴板** recognizes image data on the clipboard. On macOS,
@@ -104,8 +130,8 @@ After setup, double-click `launch_macos.command` in Finder. Choose an input:
 
 Press **Esc** to cancel a capture and keep the previous result. Temporary
 screenshots are deleted after loading. If macOS blocks screen capture, allow
-screen recording for the application that starts Texo in System Settings
-(for example, iTerm2 or Terminal), then relaunch as prompted. Texo checks this
+screen recording for Texo.app, or for the terminal if launching from a terminal,
+in System Settings, then relaunch as prompted. Texo checks this
 permission before capture: a successful screenshot command alone can still
 return only desktop wallpaper when access to application content is denied.
 

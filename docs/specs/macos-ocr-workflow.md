@@ -13,6 +13,11 @@
   Use Markdown with inline and display math delimiters for mixed output; do not
   wrap the entire Chinese result in math. Keep pure formula mode and its three
   copy formats available. Both modes work for files, clipboard images and captures.
+- Package the working local OCR as Texo.app, install it in an Applications folder
+  and verify it appears in Spotlight search. Open without a terminal window,
+  preserve the existing recognition/clipboard/capture workflows, raise the
+  existing window on repeated launch and release the shortcut when quitting.
+  Make the local runtime dependency and app-specific screen recording grant clear.
 
 ## Verification
 
@@ -23,4 +28,9 @@ Chinese on both sides of an inline formula plus a display formula. Exercise mode
 switching and Markdown copying without a trailing newline. Report model errors
 and missing native tools/model files instead of silently dropping content.
 
-Review the mixed recognition extension against `1c350341d14823af7230307d139276961433656a` before committing.
+Verify real LaunchServices launch, native app identity, one instance on repeated
+open, reopening a hidden window, recognition and clipboard output in the app,
+and normal application quit. Check Spotlight metadata for the installed path;
+report app-specific screenshot authorization separately.
+
+Review the application packaging against `3bde9322abf08a7bcbab956632e940c64df311a5` before committing.

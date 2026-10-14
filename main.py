@@ -78,6 +78,7 @@ class OCRWindow:
         self.hotkey_events = Queue()
         self.busy = False
         self.result_mode = mode
+        root.tk.call("tk", "appname", "Texo")
         root.title("Texo — 中文与公式识别")
         root.geometry("900x560")
         root.minsize(850, 400)
@@ -118,7 +119,15 @@ class OCRWindow:
         except RuntimeError as error:
             self.status.set(str(error))
         root.bind("<Destroy>", self.close, add="+")
+        if sys.platform == "darwin":
+            root.createcommand("::tk::mac::ReopenApplication", self.reopen)
+            root.createcommand("::tk::mac::Quit", root.destroy)
         root.after(100, self.poll_hotkey)
+
+    def reopen(self):
+        if not self.busy:
+            self.root.deiconify()
+            self.root.lift()
 
     def close(self, event):
         if event.widget is self.root and self.hotkey is not None:

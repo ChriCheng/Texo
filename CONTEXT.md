@@ -22,3 +22,8 @@ the remaining text with macOS Vision. Images remain local.
 **Temporary capture**: A user-selected screen region used for recognition without leaving a screenshot on the desktop.
 
 **Global shortcut**: A key combination that triggers Texo while another application is in front, for as long as Texo is running.
+
+**Local application**: A native Texo.app that runs the existing Python environment
+in the same process. LaunchServices opens one instance and macOS attributes its
+window and screenshot permissions to Texo. It requires the current checkout,
+virtual environment, models and base Python paths to stay available.

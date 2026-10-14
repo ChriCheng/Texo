@@ -27,8 +27,8 @@ def build(output):
             raise RuntimeError(f"缺少本机 Python 开发运行库：{path}。请使用包含开发文件的 Python 重建 .venv。")
     if not (ROOT / "model/model.safetensors").is_file():
         raise RuntimeError("公式模型未下载，请先运行 .venv/bin/python scripts/python/hf_hub.py pull --mixed")
-    source, icon = ROOT / "scripts/macos/launcher.m", ROOT / "assets/Texo.icns"
-    for path in (source, icon):
+    source, statusbar, popover, icon = ROOT / "scripts/macos/launcher.m", ROOT / "scripts/macos/statusbar.m", ROOT / "scripts/macos/popover.m", ROOT / "assets/Texo.icns"
+    for path in (source, statusbar, popover, icon):
         if not path.is_file():
             raise RuntimeError(f"应用封装文件缺失：{path}。请更新项目后重试。")
 
@@ -64,6 +64,7 @@ def build(output):
             "CFBundleVersion": "1",
             "LSMinimumSystemVersion": "13.0",
             "LSMultipleInstancesProhibited": True,
+            "LSUIElement": True,
             "NSHighResolutionCapable": True,
             "NSScreenCaptureUsageDescription": "Texo 仅在你主动截图识别时读取所选屏幕区域。",
             "TexoProjectRoot": str(ROOT),
@@ -71,7 +72,7 @@ def build(output):
         with (staged / "Contents/Info.plist").open("wb") as handle:
             plistlib.dump(info, handle)
         commands = (
-            ["/usr/bin/xcrun", "clang", str(source), "-O2", "-fobjc-arc", "-mmacosx-version-min=13.0", f"-I{include}", f"-L{library}", f"-lpython{python_version}", f"-Wl,-rpath,{library}", "-framework", "Foundation", "-framework", "AppKit", "-o", str(executable)],
+            ["/usr/bin/xcrun", "clang", str(source), str(statusbar), str(popover), "-O2", "-fobjc-arc", "-mmacosx-version-min=13.0", f"-I{include}", f"-L{library}", f"-lpython{python_version}", f"-Wl,-rpath,{library}", "-Wl,-export_dynamic", "-framework", "Foundation", "-framework", "AppKit", "-o", str(executable)],
             ["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", BUNDLE_ID, str(staged)],
         )
         for command in commands:

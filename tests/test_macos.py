@@ -6,7 +6,8 @@ import sys
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from PIL import Image
 
@@ -100,6 +101,58 @@ class CaptureTests(unittest.TestCase):
                 capture_image()
 
 
+class HotkeyBindingTests(unittest.TestCase):
+    def test_distinct_bindings_register_and_dispatch_only_their_identifier(self):
+        from texo.macos import GlobalHotkey, _HotkeyID
+
+        event_id = _HotkeyID(int.from_bytes(b"TEXO", "big"), 2)
+
+        def read_parameter(*arguments):
+            ctypes.cast(arguments[-1], ctypes.POINTER(_HotkeyID))[0] = event_id
+            return 0
+
+        def install(*arguments):
+            ctypes.cast(arguments[-1], ctypes.POINTER(ctypes.c_void_p))[0] = 1
+            return 0
+
+        library = SimpleNamespace(**{name: Mock(return_value=0) for name in (
+            "GetApplicationEventTarget", "InstallEventHandler", "RegisterEventHotKey",
+            "GetEventParameter", "UnregisterEventHotKey", "RemoveEventHandler",
+        )})
+        library.InstallEventHandler.side_effect = install
+        library.RegisterEventHotKey.side_effect = install
+        library.GetEventParameter.side_effect = read_parameter
+        capture, panel = Mock(), Mock()
+        with patch("texo.macos.sys.platform", "darwin"), patch("texo.macos.ctypes.CDLL", return_value=library):
+            first = GlobalHotkey(capture)
+            second = GlobalHotkey(panel, key_code=41, modifiers=(1 << 8) | (1 << 9), identifier=2, label="⌘⇧;")
+            first_call, second_call = library.RegisterEventHotKey.call_args_list
+            self.assertEqual(first_call.args[:2], (37, 1 << 8))
+            self.assertEqual(first_call.args[2].identifier, 1)
+            self.assertEqual(second_call.args[:2], (41, (1 << 8) | (1 << 9)))
+            self.assertEqual(second_call.args[2].identifier, 2)
+            self.assertEqual(first.callback(None, None, None), -9874)
+            self.assertEqual(second.callback(None, None, None), 0)
+            capture.assert_not_called()
+            panel.assert_called_once_with()
+            event_id.signature = int.from_bytes(b"ELSE", "big")
+            self.assertEqual(second.callback(None, None, None), -9874)
+            panel.assert_called_once_with()
+            first.close()
+            second.close()
+            first.close()
+            second.close()
+        self.assertEqual(library.UnregisterEventHotKey.call_count, 2)
+        self.assertEqual(library.RemoveEventHandler.call_count, 2)
+
+    def test_custom_binding_error_uses_its_label(self):
+        from texo.macos import GlobalHotkey
+
+        with patch("texo.macos.sys.platform", "linux"):
+            with self.assertRaisesRegex(RuntimeError, "⌘⇧;"):
+                GlobalHotkey(lambda: None, key_code=41, identifier=2, label="⌘⇧;")
+
+
 @unittest.skipUnless(sys.platform == "darwin" and os.environ.get("TEXO_TEST_GUI") == "1", "requires a macOS desktop session")
 class GlobalHotkeyTests(unittest.TestCase):
     @isolated_native_test
@@ -132,6 +185,7 @@ class GlobalHotkeyTests(unittest.TestCase):
         root.withdraw()
         notifications = []
         hotkey = GlobalHotkey(lambda: notifications.append("capture"))
+        panel_hotkey = GlobalHotkey(lambda: notifications.append("panel"), key_code=41, modifiers=(1 << 8) | (1 << 9), identifier=2, label="⌘⇧;")
         carbon = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
         ptr, uint, status = ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int32
         for name, arguments, result in (
@@ -147,7 +201,7 @@ class GlobalHotkeyTests(unittest.TestCase):
         event = ptr()
         try:
             self.assertEqual(carbon.CreateEvent(None, int.from_bytes(b"keyb", "big"), 5, 0, 0, ctypes.byref(event)), 0)
-            identifier = (uint * 2)(int.from_bytes(b"TEXO", "big"), 1)
+            identifier = (uint * 2)(int.from_bytes(b"TEXO", "big"), 2)
             self.assertEqual(carbon.SetEventParameter(event, int.from_bytes(b"----", "big"), int.from_bytes(b"hkid", "big"), ctypes.sizeof(identifier), identifier), 0)
             target = ptr(carbon.GetApplicationEventTarget())
             self.assertEqual(carbon.SetEventParameter(event, int.from_bytes(b"ptrg", "big"), int.from_bytes(b"etrg", "big"), ctypes.sizeof(target), ctypes.byref(target)), 0)
@@ -156,11 +210,16 @@ class GlobalHotkeyTests(unittest.TestCase):
             while not notifications and time.monotonic() < deadline:
                 root.update()
                 time.sleep(0.01)
-            self.assertEqual(notifications, ["capture"])
+            self.assertEqual(notifications, ["panel"])
+            hotkey.close()
+            panel_hotkey.close()
+            hotkey = GlobalHotkey(lambda: None)
+            panel_hotkey = GlobalHotkey(lambda: None, key_code=41, modifiers=(1 << 8) | (1 << 9), identifier=2, label="⌘⇧;")
         finally:
             if event:
                 carbon.ReleaseEvent(event)
             hotkey.close()
+            panel_hotkey.close()
             root.destroy()
 
 

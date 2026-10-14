@@ -57,13 +57,14 @@ class _HotkeyID(ctypes.Structure):
 
 
 class GlobalHotkey:
-    """Own global ⌘L until close(); callback must only enqueue work for Tk."""
+    """Own one global shortcut; callback must only enqueue work for Tk."""
 
-    def __init__(self, callback):
+    def __init__(self, callback, key_code=37, modifiers=1 << 8, identifier=1, label="⌘L"):
+        self.identifier, self.label = identifier, label
         if sys.platform != "darwin":
-            raise RuntimeError("全局 ⌘L 快捷键仅支持 macOS。")
+            raise RuntimeError(f"全局 {label} 快捷键仅支持 macOS。")
         if current_thread() is not main_thread():
-            raise RuntimeError("全局 ⌘L 快捷键必须在主线程注册。")
+            raise RuntimeError(f"全局 {label} 快捷键必须在主线程注册。")
         self.carbon = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
         ptr = ctypes.c_void_p
         uint = ctypes.c_uint32
@@ -88,7 +89,7 @@ class GlobalHotkey:
                 event, int.from_bytes(b"----", "big"), int.from_bytes(b"hkid", "big"),
                 None, ctypes.sizeof(identifier), None, ctypes.byref(identifier),
             )
-            if result or identifier.signature != int.from_bytes(b"TEXO", "big") or identifier.identifier != 1:
+            if result or identifier.signature != int.from_bytes(b"TEXO", "big") or identifier.identifier != self.identifier:
                 return -9874  # eventNotHandledErr: leave other applications' hotkeys alone.
             callback()
             return 0
@@ -99,15 +100,15 @@ class GlobalHotkey:
         result = self.carbon.InstallEventHandler(target, self.callback, 1, ctypes.byref(event_type), None, ctypes.byref(self.handler))
         if not result:
             result = self.carbon.RegisterEventHotKey(
-                37, 1 << 8, _HotkeyID(int.from_bytes(b"TEXO", "big"), 1), target, 1, ctypes.byref(self.hotkey),
+                key_code, modifiers, _HotkeyID(int.from_bytes(b"TEXO", "big"), self.identifier), target, 1, ctypes.byref(self.hotkey),
             )
         if result:
             self.close()
-            raise RuntimeError(f"无法注册全局 ⌘L，可能已被其他程序占用（macOS {result}）。")
+            raise RuntimeError(f"无法注册全局 {label}，可能已被其他程序占用（macOS {result}）。")
 
     def close(self):
         if current_thread() is not main_thread():
-            raise RuntimeError("全局 ⌘L 快捷键必须在主线程释放。")
+            raise RuntimeError(f"全局 {self.label} 快捷键必须在主线程释放。")
         if self.hotkey:
             self.carbon.UnregisterEventHotKey(self.hotkey)
             self.hotkey = ctypes.c_void_p()

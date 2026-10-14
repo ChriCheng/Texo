@@ -23,7 +23,24 @@ the remaining text with macOS Vision. Images remain local.
 
 **Global shortcut**: A key combination that triggers Texo while another application is in front, for as long as Texo is running.
 
+**Resident popover**: The native white menu-bar interface with image preview on
+the left and editable result on the right. Clicking the menu-bar icon or global
+Command-Shift-semicolon toggles it; Escape or an outside click hides it without
+quitting. Global Command-L first starts region selection, then displays the
+captured image and recognition progress. Shortcut rebinding is not yet available.
+
+**Login startup**: Opens Texo.app in the background after login, with the popover
+hidden. Quitting does not restart the app immediately and leaves the next-login
+setting enabled; disabling startup does not quit the current app. The menu-bar
+icon's right-click menu controls startup and quitting.
+
 **Local application**: A native Texo.app that runs the existing Python environment
 in the same process. LaunchServices opens one instance and macOS attributes its
 window and screenshot permissions to Texo. It requires the current checkout,
 virtual environment, models and base Python paths to stay available.
+The native app stays in the menu bar without a Dock icon; quitting
+releases its shortcuts. The terminal-launched Tk window remains a fallback.
+
+**Maintenance branch**: Local macOS changes are published only to
+`origin/codex/macos-local-ocr` in `ChriCheng/Texo`; neither `main` nor the upstream
+repository is a push or merge target.

@@ -21,6 +21,8 @@ class AppBundleTests(unittest.TestCase):
             self.library / f"libpython{sys.version_info.major}.{sys.version_info.minor}.dylib",
             self.root / "model/model.safetensors",
             self.root / "scripts/macos/launcher.m",
+            self.root / "scripts/macos/statusbar.m",
+            self.root / "scripts/macos/popover.m",
             self.root / "assets/Texo.icns",
         ):
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -53,6 +55,7 @@ class AppBundleTests(unittest.TestCase):
         self.assertEqual(info["TexoProjectRoot"], str(self.root))
         self.assertEqual(info["CFBundleIdentifier"], "com.chricheng.texo")
         self.assertTrue(info["LSMultipleInstancesProhibited"])
+        self.assertTrue(info["LSUIElement"])
         self.assertEqual(info["LSMinimumSystemVersion"], "13.0")
         self.assertEqual({str(path.relative_to(self.output)) for path in self.output.rglob("*") if path.is_file()}, {
             "Contents/Info.plist", "Contents/MacOS/Texo", "Contents/Resources/Texo.icns",

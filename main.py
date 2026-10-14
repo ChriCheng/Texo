@@ -271,6 +271,7 @@ def main():
     parser.add_argument("image", nargs="?", type=Path, help="image; omit to open the desktop window")
     parser.add_argument("--model", type=Path, default=ROOT / "model", help="local model directory")
     parser.add_argument("--mode", choices=("formula", "mixed"), help="CLI defaults to formula; desktop defaults to mixed")
+    parser.add_argument("--background", action="store_true", help="start in the menu bar without showing results")
     args = parser.parse_args()
     if args.image:
         try:
@@ -281,7 +282,17 @@ def main():
         import tkinter as tk
 
         root = tk.Tk()
-        OCRWindow(root, args.model, args.mode or "mixed")
+        from texo.popover import NativePopover
+
+        if NativePopover.available():
+            from texo.desktop import NativeOCRWindow
+
+            root.withdraw()
+            window = NativeOCRWindow(root, args.model, recognize, open_image, args.mode or "mixed")
+            if not args.background:
+                window.show()
+        else:
+            OCRWindow(root, args.model, args.mode or "mixed")
         root.mainloop()
 
 

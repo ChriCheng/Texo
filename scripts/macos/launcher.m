@@ -20,7 +20,8 @@ int main(int argc, char **argv) {
             return 1;
         }
         setenv("TEXO_APP_BUNDLE", bundle.bundlePath.fileSystemRepresentation, 1);
-        if (argc == 1) {
+        bool desktop = argc == 1 || (argc == 2 && strcmp(argv[1], "--background") == 0);
+        if (desktop) {
             NSString *logs = [project stringByAppendingPathComponent:@".local"];
             [files createDirectoryAtPath:logs withIntermediateDirectories:YES attributes:nil error:nil];
             NSString *log = [logs stringByAppendingPathComponent:@"texo-app.log"];
@@ -40,7 +41,7 @@ int main(int argc, char **argv) {
         }
         int result = Py_BytesMain(argc + 1, arguments);
         free(arguments);
-        if (result != 0 && argc == 1) {
+        if (result != 0 && desktop) {
             NSAlert *alert = [[NSAlert alloc] init];
             alert.messageText = @"Texo 启动失败";
             alert.informativeText = [@"请检查项目环境。诊断日志：" stringByAppendingString:[project stringByAppendingPathComponent:@".local/texo-app.log"]];

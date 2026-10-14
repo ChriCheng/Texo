@@ -66,8 +66,10 @@ We only list the lightweight version for the SOTA models, as we can see in terms
 
 ### macOS local OCR (no training)
 
-This fork includes a desktop window for selecting an image, recognizing a
-clipboard image, or capturing a temporary screen region with global **Command-L**.
+This fork includes a native menu-bar application for selecting an image,
+recognizing a clipboard image, or capturing a temporary screen region with
+global **Command-L**. Its white popover shows the image on the left and an
+editable recognition result on the right.
 The default **中文与公式** mode recognizes single-column Chinese/English prose
 and formulas together, producing Markdown suitable for Obsidian. Formula crops
 use the existing Texo model; prose uses macOS Vision and regions are detected
@@ -103,8 +105,19 @@ open /Applications/Texo.app
 
 If `/Applications` is not writable, use `--output ~/Applications/Texo.app`.
 After installation, press **Command-Space**, search **Texo** and press Return.
-Opening it again raises the existing window. **Command-Q**, the Dock Quit action
-or closing the window exits Texo and releases global Command-L.
+Opening it again shows the existing popover. Texo stays in the menu bar without
+a Dock icon. Click its menu-bar icon or press **Command-Shift-;** to show or hide
+the result. **Esc** in the popover or clicking outside it only hides the popover;
+recognition and the global shortcuts remain available. Right-click the icon and
+choose **退出 Texo**, or use **Command-Q** while Texo is active, to quit and release
+both shortcuts. Custom shortcut rebinding is not implemented yet.
+
+Right-click the icon and enable **登录时自动启动** to launch Texo in the background
+after logging into this Mac. The popover stays hidden until requested. This
+creates only Texo's per-user entry at
+`~/Library/LaunchAgents/com.chricheng.texo.login.plist`; it has no `KeepAlive`, so
+quitting does not immediately restart Texo. Quitting preserves the next-login
+setting, and turning the setting off leaves the currently running app open.
 
 This is a small application for the current Mac: it embeds the existing Python
 runtime in the app process and reuses this checkout's `.venv`, model files and
@@ -115,8 +128,9 @@ Startup diagnostics are appended to `.local/texo-app.log` in the project.
 The application has its own macOS screen-recording identity. On the first
 capture, allow **Texo** in System Settings → Privacy & Security → Screen
 Recording, then fully quit and reopen it. The previous terminal's authorization
-does not authorize the application. Locally rebuilding the native launcher may
-require authorizing it again. Models and user images remain local.
+does not authorize the application. The local app is ad-hoc signed; rebuilding
+the native launcher can change its code identity and require authorizing it
+again. Models and user images remain local.
 
 Choose an input in either the app or terminal-launched window:
 
@@ -125,7 +139,9 @@ Choose an input in either the app or terminal-launched window:
   **Command-Control-Shift-4** captures a selected region to the clipboard.
 - **截图识别 ⌘L** captures a region directly. Global **Command-L** triggers the
   same capture while another app is in front. Texo must remain running; this
-  takes precedence over other apps' Command-L action. Close Texo to release it.
+  takes precedence over other apps' Command-L action. The popover hides before
+  region selection and opens with the captured image and recognition progress
+  afterwards. Quit Texo to release the shortcut.
   A shortcut registration conflict is shown in the status line.
 
 Press **Esc** to cancel a capture and keep the previous result. Temporary
@@ -147,6 +163,12 @@ Click **复制结果** after checking or editing the result. Neither mode adds a
 trailing newline. Changing the mode affects the next recognition and preserves
 the current result's copy behavior. The CLI also omits the trailing newline.
 
+`launch_macos.command` still opens the terminal-launched desktop window; closing
+that window quits that instance. Menu-bar residency and login startup belong to
+Texo.app. This fork's macOS work is maintained on **origin/codex/macos-local-ocr**;
+publish changes only to that fork branch, without pushing or merging into
+`main` or the upstream repository.
+
 The extra detector is approximately 80 MB and is stored as `model/mfd.onnx`.
 If already installed by Pix2Text, its existing
 `~/.pix2text/1.1/mfd-1.5-onnx/pix2text-mfd-1.5.onnx` cache is reused. Weights,
@@ -161,7 +183,7 @@ content is not reconstructed. You can also recognize a file directly:
 .venv/bin/python main.py --mode mixed path/to/chinese-and-math.png
 .venv/bin/python -m unittest discover -s tests -v
 # Optional: include the desktop callback and clipboard test in a GUI session.
-# Close any running Texo window first to release global Command-L.
+# Quit any running Texo instance first to release its global shortcuts.
 TEXO_TEST_GUI=1 .venv/bin/python -m unittest discover -s tests -v
 ```
 

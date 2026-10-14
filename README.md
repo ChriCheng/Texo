@@ -63,6 +63,44 @@ We only list the lightweight version for the SOTA models, as we can see in terms
 
 
 ## Configure environment
+
+### macOS local OCR (no training)
+
+This fork includes a desktop window for selecting a formula image and copying
+the recognized LaTeX. Inference runs on CPU and uses the existing Texo model and
+image processor. Images stay on your Mac; model downloads are needed only during
+setup.
+
+Use Python 3.11 or 3.12 with Tk support. Check your interpreter first:
+`python3 -c 'import tkinter; print(tkinter.TkVersion)'`.
+If it reports a missing `_tkinter`, use a Python installation that includes Tk
+(for example, a Conda environment with `python=3.11 tk`).
+
+```sh
+git clone https://github.com/ChriCheng/Texo.git
+cd Texo
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-macos.txt
+.venv/bin/python scripts/python/hf_hub.py pull
+./launch_macos.command
+```
+
+After setup, double-click `launch_macos.command` in Finder, select an image, and
+click **复制 LaTeX** to copy the result. You can also recognize a file directly:
+
+```sh
+.venv/bin/python main.py path/to/formula.png
+.venv/bin/python -m unittest discover -s tests -v
+# Optional: include the desktop callback and clipboard test in a GUI session.
+TEXO_TEST_GUI=1 .venv/bin/python -m unittest discover -s tests -v
+```
+
+The OCR integration test uses `tests/fixtures/simple.png`, a locally rendered
+image of `x^2+y^2=z^2`. It runs when the model has been downloaded. Review OCR
+output before using it; complex formulas and unusual fonts can be misrecognized.
+
+### Full training environment
+
 ```sh
 git clone https://github.com/alephpi/Texo
 uv sync

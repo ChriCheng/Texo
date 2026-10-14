@@ -68,26 +68,33 @@ We only list the lightweight version for the SOTA models, as we can see in terms
 
 This fork includes a desktop window for selecting an image, recognizing a
 clipboard image, or capturing a temporary screen region with global **Command-L**.
-Inference runs on CPU and uses the existing Texo model and image processor.
-Images stay on your Mac; model downloads are needed only during setup.
+The default **中文与公式** mode recognizes single-column Chinese/English prose
+and formulas together, producing Markdown suitable for Obsidian. Formula crops
+use the existing Texo model; prose uses macOS Vision and regions are detected
+with [Pix2Text MFD 1.5](https://huggingface.co/breezedeus/pix2text-mfd-1.5).
+Images stay on your Mac; no training or OCR service is required.
 
 Use Python 3.11 or 3.12 with Tk support. Check your interpreter first:
 `python3 -c 'import tkinter; print(tkinter.TkVersion)'`.
 If it reports a missing `_tkinter`, use a Python installation that includes Tk
 (for example, a Conda environment with `python=3.11 tk`).
+Chinese recognition also requires macOS 13+ and Apple Command Line Tools
+(`xcode-select --install` if they are missing). A small Vision helper compiles
+automatically on first use and is cached under `.local/bin`; a cold Swift module
+cache can make the first recognition take several minutes.
 
 ```sh
 git clone --branch codex/macos-local-ocr https://github.com/ChriCheng/Texo.git
 cd Texo
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-macos.txt
-.venv/bin/python scripts/python/hf_hub.py pull
+.venv/bin/python scripts/python/hf_hub.py pull --mixed
 ./launch_macos.command
 ```
 
 After setup, double-click `launch_macos.command` in Finder. Choose an input:
 
-- **选择图片** opens a saved formula image.
+- **选择图片** opens a saved text or formula image.
 - **识别剪贴板** recognizes image data on the clipboard. On macOS,
   **Command-Control-Shift-4** captures a selected region to the clipboard.
 - **截图识别 ⌘L** captures a region directly. Global **Command-L** triggers the
@@ -102,10 +109,22 @@ screen recording for the application that starts Texo in System Settings
 permission before capture: a successful screenshot command alone can still
 return only desktop wallpaper when access to application content is denied.
 
-Select **LaTeX**, **$LaTeX$**, or **$$LaTeX$$** in the format menu, then click
-**复制 LaTeX**. These copy plain source, inline math, or display math respectively,
-with no trailing newline. You can edit the result before copying. The CLI also
-omits the trailing newline.
+Choose the recognition mode before selecting an image or capturing:
+
+- **中文与公式** keeps prose outside math, inserts `$...$` around inline formulas
+  and `$$...$$` around display formulas, and copies the complete Markdown. The
+  formula format menu is disabled for mixed results.
+- **公式** recognizes one formula. Select **LaTeX**, **$LaTeX$**, or **$$LaTeX$$**
+  in the format menu to copy plain source, inline math, or display math.
+
+Click **复制结果** after checking or editing the result. Neither mode adds a
+trailing newline. Changing the mode affects the next recognition and preserves
+the current result's copy behavior. The CLI also omits the trailing newline.
+
+The extra detector is approximately 80 MB and is stored as `model/mfd.onnx`.
+If already installed by Pix2Text, its existing
+`~/.pix2text/1.1/mfd-1.5-onnx/pix2text-mfd-1.5.onnx` cache is reused. Weights,
+Swift build products and user screenshots are not included in this repository.
 
 Texo's verified KaTeX aliases `\larr` and `\infin` are converted to the equivalent
 `\leftarrow` and `\infty` commands for Obsidian/MathJax. Cropped-away formula
@@ -113,15 +132,19 @@ content is not reconstructed. You can also recognize a file directly:
 
 ```sh
 .venv/bin/python main.py path/to/formula.png
+.venv/bin/python main.py --mode mixed path/to/chinese-and-math.png
 .venv/bin/python -m unittest discover -s tests -v
 # Optional: include the desktop callback and clipboard test in a GUI session.
 # Close any running Texo window first to release global Command-L.
 TEXO_TEST_GUI=1 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The OCR integration test uses `tests/fixtures/simple.png`, a locally rendered
-image of `x^2+y^2=z^2`. It runs when the model has been downloaded. Review OCR
-output before using it; complex formulas and unusual fonts can be misrecognized.
+The OCR integration tests use locally rendered formula, Chinese and mixed
+fixtures under `tests/fixtures`. Native Chinese and desktop tests require
+`TEXO_TEST_GUI=1` in a normal macOS session. Review output before using it:
+complex formulas, unusual fonts and low-resolution images can be misrecognized.
+Mixed reading order currently supports single-column crops; multi-column pages,
+tables and handwriting have not been validated.
 
 ### Full training environment
 

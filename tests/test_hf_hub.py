@@ -14,7 +14,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "scripts/python/hf_hub.py"
 class HubDownloadTests(unittest.TestCase):
     def setUp(self):
         self.hub = types.ModuleType("huggingface_hub")
-        for name in ("HfApi", "create_repo", "snapshot_download"):
+        for name in ("HfApi", "create_repo", "snapshot_download", "hf_hub_download"):
             setattr(self.hub, name, Mock())
         transformers = types.ModuleType("transformers")
         for name in ("AutoTokenizer", "VisionEncoderDecoderModel", "PreTrainedTokenizerFast"):
@@ -46,6 +46,15 @@ class HubDownloadTests(unittest.TestCase):
         self.hub.snapshot_download.assert_called_once_with(
             repo_id="alephpi/FormulaNet", local_dir="./model"
         )
+
+    def test_mixed_pull_adds_only_the_formula_detector(self):
+        self.hub.hf_hub_download.return_value = "/cache/mfd.onnx"
+        with patch("shutil.copyfile") as copy:
+            self.run_cli("pull", "--mixed")
+        self.hub.hf_hub_download.assert_called_once_with(
+            repo_id="breezedeus/pix2text-mfd-1.5", filename="pix2text-mfd-1.5.onnx",
+        )
+        copy.assert_called_once_with("/cache/mfd.onnx", Path("model/mfd.onnx"))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from pathlib import Path
+import shutil
 
-from huggingface_hub import HfApi, create_repo, snapshot_download
+from huggingface_hub import HfApi, create_repo, hf_hub_download, snapshot_download
 from transformers import AutoTokenizer, PreTrainedTokenizerFast, VisionEncoderDecoderModel
 
 
@@ -45,6 +46,9 @@ def pull(args):
             local_dir="./model",
             ignore_patterns=["checkpoints/**", "onnx/**"]
         )
+    if args.mixed:
+        detector = hf_hub_download(repo_id="breezedeus/pix2text-mfd-1.5", filename="pix2text-mfd-1.5.onnx")
+        shutil.copyfile(detector, Path("model/mfd.onnx"))
 
 if __name__ == '__main__':
     import argparse
@@ -55,6 +59,7 @@ if __name__ == '__main__':
 
     sub_parser = sub_parsers.add_parser("pull", help="pull model from HF hub")
     sub_parser.add_argument("--with_useful_ckpts", action="store_true", help="pull with useful checkpoints")
+    sub_parser.add_argument("--mixed", action="store_true", help="also download the mixed text/formula detector")
     sub_parser.set_defaults(func=pull)
 
     args = parser.parse_args()

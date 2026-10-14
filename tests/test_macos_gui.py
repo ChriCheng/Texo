@@ -15,7 +15,7 @@ class DesktopTests(unittest.TestCase):
         from PIL import Image
 
         root = tk.Tk()
-        window = OCRWindow(root, ROOT / "model")
+        window = OCRWindow(root, ROOT / "model", mode="formula")
         try:
             previous_clipboard = root.clipboard_get()
         except tk.TclError:
@@ -24,11 +24,11 @@ class DesktopTests(unittest.TestCase):
         def choose_and_wait(path):
             with patch("tkinter.filedialog.askopenfilename", return_value=str(path)):
                 window.select_button.invoke()
-            deadline = time.monotonic() + 30
+            deadline = time.monotonic() + 300
             while window.select_button.cget("state") == "disabled":
                 root.update()
                 if time.monotonic() > deadline:
-                    self.fail("desktop OCR did not finish within 30 seconds")
+                    self.fail("desktop OCR did not finish within 300 seconds")
                 time.sleep(0.01)
 
         try:
@@ -78,6 +78,23 @@ class DesktopTests(unittest.TestCase):
                 self.assertIn("空白", window.status.get())
             choose_and_wait(ROOT / "tests/fixtures/simple.png")
             self.assertIn("识别完成", window.status.get())
+            window.mode.set("中文与公式")
+            choose_and_wait(ROOT / "tests/fixtures/mixed.png")
+            markdown = window.output.get("1.0", "end-1c")
+            self.assertTrue(markdown.startswith("若模型输出满足 $"))
+            self.assertIn("\n\n$$", markdown)
+            self.assertEqual(str(window.copy_format_menu.cget("state")), "disabled")
+            window.output.insert("end", "\n")
+            window.copy_button.invoke()
+            self.assertEqual(root.clipboard_get(), markdown)
+            # Changing the next input's mode must not rewrap the previous mixed result.
+            window.mode.set("公式")
+            window.copy_button.invoke()
+            self.assertEqual(root.clipboard_get(), markdown)
+            choose_and_wait(ROOT / "tests/fixtures/simple.png")
+            self.assertEqual(str(window.copy_format_menu.cget("state")), "readonly")
+            window.copy_button.invoke()
+            self.assertEqual(root.clipboard_get(), f"$${latex}$$")
         finally:
             root.clipboard_clear()
             if previous_clipboard is not None:

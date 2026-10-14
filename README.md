@@ -97,7 +97,10 @@ After setup, double-click `launch_macos.command` in Finder. Choose an input:
 
 Press **Esc** to cancel a capture and keep the previous result. Temporary
 screenshots are deleted after loading. If macOS blocks screen capture, allow
-screen recording for the application that starts Texo in System Settings.
+screen recording for the application that starts Texo in System Settings
+(for example, iTerm2 or Terminal), then relaunch as prompted. Texo checks this
+permission before capture: a successful screenshot command alone can still
+return only desktop wallpaper when access to application content is denied.
 
 Select **LaTeX**, **$LaTeX$**, or **$$LaTeX$$** in the format menu, then click
 **复制 LaTeX**. These copy plain source, inline math, or display math respectively,
@@ -112,6 +115,7 @@ content is not reconstructed. You can also recognize a file directly:
 .venv/bin/python main.py path/to/formula.png
 .venv/bin/python -m unittest discover -s tests -v
 # Optional: include the desktop callback and clipboard test in a GUI session.
+# Close any running Texo window first to release global Command-L.
 TEXO_TEST_GUI=1 .venv/bin/python -m unittest discover -s tests -v
 ```
 

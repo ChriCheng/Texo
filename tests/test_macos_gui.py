@@ -57,7 +57,7 @@ class DesktopTests(unittest.TestCase):
             self.assertEqual(window.output.get("1.0", "end-1c"), latex)
             from subprocess import CompletedProcess
 
-            with patch("subprocess.run", return_value=CompletedProcess([], 1, b"", b"")):
+            with patch("texo.macos.screen_capture_allowed", return_value=True), patch("subprocess.run", return_value=CompletedProcess([], 1, b"", b"")):
                 window.capture_button.invoke()
                 deadline = time.monotonic() + 5
                 while window.busy:

@@ -15,7 +15,19 @@ def read_clipboard_image():
     return image.copy()
 
 
+def screen_capture_allowed():
+    if sys.platform != "darwin":
+        raise RuntimeError("截图识别仅支持 macOS。")
+    core_graphics = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+    preflight = core_graphics.CGPreflightScreenCaptureAccess
+    preflight.argtypes = []
+    preflight.restype = ctypes.c_bool
+    return bool(preflight())
+
+
 def capture_image():
+    if not screen_capture_allowed():
+        raise RuntimeError("截图权限未开启。请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许启动 Texo 的应用（如 iTerm2 或 Terminal），然后完全退出并重开该应用与 Texo。")
     with tempfile.TemporaryDirectory(prefix="texo-capture-") as directory:
         path = Path(directory) / "formula.png"
         result = subprocess.run(

@@ -47,6 +47,19 @@ class ClipboardTests(unittest.TestCase):
 
 
 class CaptureTests(unittest.TestCase):
+    def setUp(self):
+        permission = patch("texo.macos.screen_capture_allowed", return_value=True)
+        permission.start()
+        self.addCleanup(permission.stop)
+
+    def test_denied_screen_permission_is_reported_before_capture(self):
+        from texo.macos import capture_image
+
+        with patch("texo.macos.screen_capture_allowed", return_value=False), patch("subprocess.run") as run:
+            with self.assertRaisesRegex(RuntimeError, "屏幕录制.*iTerm2"):
+                capture_image()
+        run.assert_not_called()
+
     def test_capture_reads_image_and_removes_temporary_file(self):
         from texo.macos import capture_image
 

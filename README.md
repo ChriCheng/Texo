@@ -86,7 +86,7 @@ automatically on first use and is cached under `.local/bin`; a cold Swift module
 cache can make the first recognition take several minutes.
 
 ```sh
-git clone --branch codex/macos-local-ocr https://github.com/ChriCheng/Texo.git
+git clone --branch main https://github.com/ChriCheng/Texo.git
 cd Texo
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-macos.txt
@@ -220,9 +220,11 @@ document themes or slide layouts.
 
 `launch_macos.command` still opens the terminal-launched desktop window; closing
 that window quits that instance. Menu-bar residency and login startup belong to
-Texo.app. This fork's macOS work is maintained on **origin/codex/macos-local-ocr**;
-publish changes only to that fork branch, without pushing or merging into
-`main` or the upstream repository.
+Texo.app. This fork's personal macOS version is maintained on
+**ChriCheng/Texo:main**. Develop changes on feature branches, such as
+`codex/macos-local-ocr`, and merge tested changes into this fork's `main`.
+Upstream updates from `alephpi/Texo` are reviewed and merged only when the user
+chooses; do not configure automatic upstream synchronization or push to upstream.
 
 The extra detector is approximately 80 MB and is stored as `model/mfd.onnx`.
 If already installed by Pix2Text, its existing

@@ -51,8 +51,11 @@
 - Preserve the dependency on this checkout, its virtual environment, models and
   base Python installation. Rebuilding the ad-hoc-signed launcher can require
   screen-recording authorization again. Shortcut rebinding remains future work.
-- Publish macOS changes only to the user's fork branch
-  `origin/codex/macos-local-ocr`; do not push or merge into `main` or upstream.
+- Maintain the user's personal macOS version on `ChriCheng/Texo:main`.
+  Develop on feature branches such as `codex/macos-local-ocr`, then merge tested
+  changes into the fork's `main`. Review upstream updates from `alephpi/Texo`
+  and merge them only when the user chooses; do not configure automatic upstream
+  synchronization or push to the upstream repository.
 
 ## Verification
 

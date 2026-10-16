@@ -71,6 +71,7 @@ virtual environment, models and base Python paths to stay available.
 The native app stays in the menu bar without a Dock icon; quitting
 releases its shortcuts. The terminal-launched Tk window remains a fallback.
 
-**Maintenance branch**: Local macOS changes are published only to
-`origin/codex/macos-local-ocr` in `ChriCheng/Texo`; neither `main` nor the upstream
-repository is a push or merge target.
+**Maintenance branch**: `ChriCheng/Texo:main` is the stable personal macOS
+version, with feature branches holding changes under development. The upstream
+`alephpi/Texo` is an optional update source whose changes require the user's
+manual decision to merge.

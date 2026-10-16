@@ -22,6 +22,7 @@ _API = (
     ("TexoPopoverSetResultMode", [ctypes.c_int], None),
     ("TexoPopoverGetFormat", [], ctypes.c_int),
     ("TexoPopoverSetFormat", [ctypes.c_int], None),
+    ("TexoPopoverSetCopyMode", [ctypes.c_int], None),
     ("TexoPopoverResetUndo", [], None),
     ("TexoPopoverSetCaptureShortcut", [ctypes.c_char_p], None),
     ("TexoCopyOffice", [ctypes.c_char_p, ctypes.c_char_p], ctypes.c_bool),
@@ -97,6 +98,11 @@ class NativePopover:
         _require_main_thread()
         if self.installed:
             self.library.TexoPopoverSetCaptureShortcut(label.encode("utf-8"))
+
+    def set_copy_mode(self, mode):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoPopoverSetCopyMode(mode)
 
     def copy_office(self, payload):
         _require_main_thread()

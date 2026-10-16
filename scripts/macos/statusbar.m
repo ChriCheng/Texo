@@ -13,6 +13,7 @@ extern NSString *TexoShortcutCharacter(int action);
 @property(nonatomic, strong) NSMenuItem *loginItem;
 @property(nonatomic, strong) NSArray<NSMenuItem *> *formatItems;
 @property(nonatomic, strong) NSArray<NSMenuItem *> *modeItems;
+@property(nonatomic, strong) NSArray<NSMenuItem *> *clipboardModeItems;
 @property(nonatomic, strong) NSImage *normalImage;
 @property(nonatomic, strong) NSTimer *progressTimer;
 @property(nonatomic, assign) double progress;
@@ -121,6 +122,25 @@ void TexoSetCopyFormat(int format) {
 }
 
 __attribute__((visibility("default")))
+int TexoGetCopyMode(void) {
+    if (!NSThread.isMainThread) {
+        return 0;
+    }
+    return [NSUserDefaults.standardUserDefaults integerForKey:@"TexoCopyMode"] == 1 ? 1 : 0;
+}
+
+__attribute__((visibility("default")))
+void TexoSetCopyMode(int mode) {
+    if (!NSThread.isMainThread || (mode != 0 && mode != 1)) {
+        return;
+    }
+    [NSUserDefaults.standardUserDefaults setInteger:mode forKey:@"TexoCopyMode"];
+    for (NSUInteger index = 0; index < controller.clipboardModeItems.count; index++) {
+        controller.clipboardModeItems[index].state = (int)index == mode ? NSControlStateValueOn : NSControlStateValueOff;
+    }
+}
+
+__attribute__((visibility("default")))
 int TexoGetRecognitionMode(void) {
     if (!NSThread.isMainThread) {
         return 0;
@@ -170,35 +190,38 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
     [controller.menu addItem:NSMenuItem.separatorItem];
     [controller addItem:@"显示／收起结果" tag:1 to:controller.menu key:@";" modifiers:NSEventModifierFlagCommand | NSEventModifierFlagShift];
     [controller addItem:@"复制结果" tag:7 to:controller.menu key:@"" modifiers:0];
-    [controller addItem:@"PPT 专用复制" tag:9 to:controller.menu key:@"" modifiers:0];
     [controller.menu addItem:NSMenuItem.separatorItem];
-    NSMenu *settings = [[NSMenu alloc] initWithTitle:@"设定"];
-    NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"设定" action:nil keyEquivalent:@""];
-    settingsItem.submenu = settings;
-    [controller.menu addItem:settingsItem];
-    NSMenu *modes = [[NSMenu alloc] initWithTitle:@"识别模式"];
-    NSMenuItem *modeItem = [[NSMenuItem alloc] initWithTitle:@"识别模式" action:nil keyEquivalent:@""];
-    modeItem.submenu = modes;
-    [settings addItem:modeItem];
+    NSMenuItem *modeTitle = [[NSMenuItem alloc] initWithTitle:@"识别模式" action:nil keyEquivalent:@""];
+    modeTitle.enabled = NO;
+    [controller.menu addItem:modeTitle];
     controller.modeItems = @[
-        [controller addItem:@"中文与公式" tag:20 to:modes key:@"" modifiers:0],
-        [controller addItem:@"公式" tag:21 to:modes key:@"" modifiers:0]
+        [controller addItem:@"中文与公式" tag:20 to:controller.menu key:@"" modifiers:0],
+        [controller addItem:@"公式" tag:21 to:controller.menu key:@"" modifiers:0]
     ];
-    NSMenu *formats = [[NSMenu alloc] initWithTitle:@"公式复制格式"];
-    NSMenuItem *formatItem = [[NSMenuItem alloc] initWithTitle:@"公式复制格式" action:nil keyEquivalent:@""];
-    formatItem.submenu = formats;
-    [settings addItem:formatItem];
+    [controller.menu addItem:NSMenuItem.separatorItem];
+    NSMenuItem *copyModeTitle = [[NSMenuItem alloc] initWithTitle:@"复制方式" action:nil keyEquivalent:@""];
+    copyModeTitle.enabled = NO;
+    [controller.menu addItem:copyModeTitle];
+    controller.clipboardModeItems = @[
+        [controller addItem:@"普通复制" tag:40 to:controller.menu key:@"" modifiers:0],
+        [controller addItem:@"PPT 专用复制" tag:41 to:controller.menu key:@"" modifiers:0]
+    ];
+    [controller.menu addItem:NSMenuItem.separatorItem];
+    NSMenuItem *formatTitle = [[NSMenuItem alloc] initWithTitle:@"公式格式" action:nil keyEquivalent:@""];
+    formatTitle.enabled = NO;
+    [controller.menu addItem:formatTitle];
     controller.formatItems = @[
-        [controller addItem:@"公式" tag:10 to:formats key:@"" modifiers:0],
-        [controller addItem:@"$公式$" tag:11 to:formats key:@"" modifiers:0],
-        [controller addItem:@"$$公式$$" tag:12 to:formats key:@"" modifiers:0]
+        [controller addItem:@"公式" tag:10 to:controller.menu key:@"" modifiers:0],
+        [controller addItem:@"$公式$" tag:11 to:controller.menu key:@"" modifiers:0],
+        [controller addItem:@"$$公式$$" tag:12 to:controller.menu key:@"" modifiers:0]
     ];
-    [settings addItem:NSMenuItem.separatorItem];
-    [controller addItem:@"快捷键设置…" tag:30 to:settings key:@"" modifiers:0];
-    controller.loginItem = [controller addItem:@"登录时自动启动" tag:4 to:settings key:@"" modifiers:0];
+    [controller.menu addItem:NSMenuItem.separatorItem];
+    [controller addItem:@"快捷键设置…" tag:30 to:controller.menu key:@"" modifiers:0];
+    controller.loginItem = [controller addItem:@"登录时自动启动" tag:4 to:controller.menu key:@"" modifiers:0];
     [controller.menu addItem:NSMenuItem.separatorItem];
     [controller addItem:@"退出 Texo" tag:5 to:controller.menu key:@"q" modifiers:NSEventModifierFlagCommand];
     TexoSetCopyFormat(TexoGetCopyFormat());
+    TexoSetCopyMode(TexoGetCopyMode());
     TexoSetRecognitionMode(TexoGetRecognitionMode());
     TexoRefreshShortcutPresentation();
     controller.item.menu = controller.menu;

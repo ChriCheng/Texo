@@ -139,7 +139,7 @@ class NativeOCRWindow:
             self.statusbar.set_progress(-1)
 
     def poll(self):
-        actions = {1: self.toggle, 2: self.screenshot, 3: self.clipboard, 4: self.toggle_login, 5: self.root.destroy, 6: self.choose, 7: self.copy, 9: self.copy_ppt, 30: self.open_shortcut_settings, 31: self.save_shortcut_settings, 32: self.cancel_shortcut_settings}
+        actions = {1: self.toggle, 2: self.screenshot, 3: self.clipboard, 4: self.toggle_login, 5: self.root.destroy, 6: self.choose, 7: self.copy, 30: self.open_shortcut_settings, 31: self.save_shortcut_settings, 32: self.cancel_shortcut_settings}
         while True:
             try:
                 event = self.events.get_nowait()
@@ -152,6 +152,10 @@ class NativeOCRWindow:
                     continue
                 if event in (20, 21):
                     self.panel.set_mode(event - 20)
+                    continue
+                if event in (40, 41):
+                    self.statusbar.set_copy_mode(event - 40)
+                    self.panel.set_copy_mode(event - 40)
                     continue
                 if event in actions:
                     actions[event]()
@@ -183,7 +187,8 @@ class NativeOCRWindow:
                 self.set_busy(False)
                 if not error and self.copy(automatic=True):
                     self.panel.set_status(f"识别完成 · {detail:.2f} 秒 · 已自动复制。")
-                self.show()
+                if not self.busy:
+                    self.show()
             elif kind == "progress":
                 if value is not None:
                     self.statusbar.set_progress(value, detail)
@@ -196,7 +201,10 @@ class NativeOCRWindow:
                             raise RuntimeError("无法写入剪贴板，请重试。")
                     except Exception as failure:
                         error = str(failure)
-                self.panel.set_status(f"PPT 复制失败：{error}" if error else "PPT 内容已复制，可直接粘贴到 PowerPoint。")
+                copied = "PPT 内容已自动复制，可直接粘贴到 PowerPoint。" if detail else "PPT 内容已复制，可直接粘贴到 PowerPoint。"
+                self.panel.set_status(f"PPT 复制失败：{error}" if error else copied)
+                if detail or error:
+                    self.show()
             elif kind == "login":
                 self.login_busy = False
                 if error:
@@ -300,9 +308,26 @@ class NativeOCRWindow:
         return text
 
     def copy(self, automatic=False):
+        if self.busy or self.shortcuts_active:
+            return False
         text = self.format_result()
         if automatic:
             self.panel.reset_undo()
+        if text and self.statusbar.get_copy_mode() == 1:
+            pure_latex = self.result_mode == 1
+            self.set_busy(True)
+            self.panel.set_status("正在准备 PPT 复制…")
+
+            def worker():
+                try:
+                    from texo.office import make_office_payload
+
+                    self.events.put(("office", make_office_payload(text, pure_latex=pure_latex), automatic, None))
+                except Exception as error:
+                    self.events.put(("office", None, automatic, str(error)))
+
+            Thread(target=worker, daemon=True).start()
+            return False
         if text:
             try:
                 self.root.clipboard_clear()
@@ -314,26 +339,6 @@ class NativeOCRWindow:
                 self.panel.set_status("结果已复制。")
             return True
         return False
-
-    def copy_ppt(self):
-        if self.busy or self.shortcuts_active:
-            return
-        text = self.format_result()
-        if not text:
-            return
-        pure_latex = self.result_mode == 1
-        self.set_busy(True)
-        self.panel.set_status("正在准备 PPT 复制…")
-
-        def worker():
-            try:
-                from texo.office import make_office_payload
-
-                self.events.put(("office", make_office_payload(text, pure_latex=pure_latex), None, None))
-            except Exception as error:
-                self.events.put(("office", None, None, str(error)))
-
-        Thread(target=worker, daemon=True).start()
 
     def toggle_login(self):
         if self.login_busy:

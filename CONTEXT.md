@@ -9,9 +9,12 @@ and formula screenshots into Markdown on macOS.
 
 **Copy format**: The recognition result copied as plain LaTeX, inline math enclosed in single dollar signs, or display math enclosed in double dollar signs. The native app defaults to display math and remembers the selection. No format includes a trailing newline.
 
-**PPT copy**: An explicit copy action that preserves prose and converts formula
-source in the edited result into rich content for PowerPoint's editable
-equations. Ordinary and automatic copy keep the text format.
+**Copy mode**: A saved, mutually exclusive choice between ordinary text copy
+(the default) and PPT copy, used by both manual and automatic copy.
+
+**PPT copy**: Preserves prose and converts formula source in the result into
+rich content for PowerPoint's editable equations. Ordinary copy keeps the
+selected LaTeX or Markdown text.
 
 **Result editing**: Standard text selection, copy, cut, paste, undo and redo
 within the focused result editor, including undo of manual edits and format
@@ -40,7 +43,8 @@ combinations, while Cancel preserves the previous ones.
 
 **Resident popover**: The native white menu-bar interface with image preview on
 the left and editable result on the right. Either mouse button opens the icon's
-menu; its show/hide item or global Command-Shift-semicolon toggles the popover.
+menu; all settings appear at its first level in separated groups. Its show/hide
+item or global Command-Shift-semicolon toggles the popover.
 Escape or an outside click hides it without quitting. Global Command-L starts
 region selection. File, clipboard and screenshot recognition keep the popover
 hidden during OCR by default; users can still request progress. Success shows

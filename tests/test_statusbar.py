@@ -36,20 +36,26 @@ class StatusBarTests(unittest.TestCase):
         library.TexoInstallStatusItem.return_value = True
         library.TexoGetCopyFormat.return_value = 2
         library.TexoGetRecognitionMode.return_value = 0
+        library.TexoGetCopyMode.return_value = 0
         with patch("texo.statusbar.sys.platform", "darwin"), patch("texo.statusbar.ctypes.CDLL", return_value=library):
             statusbar = StatusBar(lambda event: None)
             self.assertEqual(statusbar.get_copy_format(), 2)
             self.assertEqual(statusbar.get_recognition_mode(), 0)
+            self.assertEqual(statusbar.get_copy_mode(), 0)
             statusbar.set_copy_format(1)
             statusbar.set_recognition_mode(1)
+            statusbar.set_copy_mode(1)
             for value, label in ((0.25, "处理图片"), (-2, "识别公式"), (-1, "")):
                 statusbar.set_progress(value, label)
             statusbar.close()
             statusbar.set_progress(0.5, "已关闭")
             statusbar.set_copy_format(0)
             statusbar.set_recognition_mode(0)
+            statusbar.set_copy_mode(0)
+            self.assertEqual(statusbar.get_copy_mode(), 0)
         library.TexoSetCopyFormat.assert_called_once_with(1)
         library.TexoSetRecognitionMode.assert_called_once_with(1)
+        library.TexoSetCopyMode.assert_called_once_with(1)
         self.assertEqual(library.TexoSetRecognitionProgress.call_args_list, [
             call(0.25, "处理图片".encode("utf-8")),
             call(-2, "识别公式".encode("utf-8")),

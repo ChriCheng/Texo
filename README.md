@@ -111,7 +111,7 @@ a Dock icon. Left-click or right-click its menu-bar icon to open the menu. Choos
 **Esc** in the popover or clicking outside it only hides the popover;
 recognition and the global shortcuts remain available. Open the icon's menu and
 choose **退出 Texo**, or use **Command-Q** while Texo is active, to quit and release
-both shortcuts. To change them, open **设定 → 快捷键设置**, click a recording
+both shortcuts. To change them, choose **快捷键设置** in the icon's menu, click a recording
 button and press the new combination, then click **应用**. The two combinations
 must differ and include Command, Control or Option. Common editing shortcuts
 are reserved. Texo pauses its global shortcuts while settings are open;
@@ -126,10 +126,10 @@ smoothly fills as processing stages or formula regions finish, then holds
 until the next stage completes. It shows completed work, not estimated time.
 Completion, failure and cancellation restore the normal icon. Single-formula
 results display the selected `LaTeX`, `$LaTeX$` or `$$LaTeX$$` format directly;
-changing the format keeps edits and updates the displayed delimiters. Copying
+changing the format keeps edits and updates the displayed delimiters. Ordinary copying
 uses the same text, without adding another pair of delimiters.
 
-Open the icon's menu and enable **设定 → 登录时自动启动** to launch Texo in the background
+Open the icon's menu and enable **登录时自动启动** to launch Texo in the background
 after logging into this Mac. The popover stays hidden until requested. This
 creates only Texo's per-user entry at
 `~/Library/LaunchAgents/com.chricheng.texo.login.plist`; it has no `KeepAlive`, so
@@ -203,10 +203,16 @@ The native result editor supports **Command-A**, **Command-C/X/V**, **Command-Z*
 and **Command-Shift-Z** while it has keyboard focus. Manual edits and changes
 to copy delimiters can be undone. Each new recognition starts a new undo history.
 
-Use **PPT 专用复制** in the native result panel or menu to paste Chinese prose and math
-into PowerPoint as rich content with editable Office equations. This explicit
-action uses the current edited result; normal and automatic copy still produce
-the selected LaTeX/Markdown text. The converter runs locally using Pandoc
+All settings appear directly in the icon's menu, with separators between groups.
+Under **复制方式**, check **普通复制** (the default) or **PPT 专用复制**.
+The two choices are mutually exclusive and survive restart. Both the result
+panel's single copy button and recognition's automatic copy follow this choice.
+The menu's **复制结果** action follows it too; Command-C in the editor still copies
+the selected text normally.
+Ordinary copy produces the selected LaTeX/Markdown text; PPT copy preserves
+Chinese prose and converts math into rich content with editable Office equations.
+The copy button changes to **复制到 PPT** in PPT mode. Manual copy uses the current
+edited result. The converter runs locally using Pandoc
 (`brew install pandoc` if missing); a conversion error leaves the clipboard
 unchanged. Supported formula commands depend on Pandoc and PowerPoint's MathML
 importer. This is not a full LaTeX document compiler, and it does not transfer

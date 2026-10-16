@@ -12,6 +12,8 @@ _API = (
     ("TexoSetLoginEnabled", [ctypes.c_bool], None),
     ("TexoGetCopyFormat", [], ctypes.c_int),
     ("TexoSetCopyFormat", [ctypes.c_int], None),
+    ("TexoGetCopyMode", [], ctypes.c_int),
+    ("TexoSetCopyMode", [ctypes.c_int], None),
     ("TexoGetRecognitionMode", [], ctypes.c_int),
     ("TexoSetRecognitionMode", [ctypes.c_int], None),
     ("TexoSetRecognitionProgress", [ctypes.c_double, ctypes.c_char_p], None),
@@ -79,6 +81,15 @@ class StatusBar:
     def get_recognition_mode(self):
         _require_main_thread()
         return self.library.TexoGetRecognitionMode() if self.installed else 0
+
+    def get_copy_mode(self):
+        _require_main_thread()
+        return self.library.TexoGetCopyMode() if self.installed else 0
+
+    def set_copy_mode(self, mode):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoSetCopyMode(mode)
 
     def set_recognition_mode(self, mode):
         _require_main_thread()

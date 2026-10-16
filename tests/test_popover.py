@@ -62,11 +62,15 @@ class NativePopoverTests(unittest.TestCase):
         self.assertEqual(popover.get_format(), 2)
         popover.set_mode(1)
         popover.set_format(0)
+        popover.set_copy_mode(1)
         self.library.TexoPopoverSetMode.assert_called_once_with(1)
         self.library.TexoPopoverSetFormat.assert_called_once_with(0)
+        self.library.TexoPopoverSetCopyMode.assert_called_once_with(1)
         popover.close()
         popover.set_format(1)
+        popover.set_copy_mode(0)
         self.library.TexoPopoverSetFormat.assert_called_once_with(0)
+        self.library.TexoPopoverSetCopyMode.assert_called_once_with(1)
 
     def test_missing_launcher_symbols_explains_how_to_start(self):
         with patch("texo.popover.ctypes.CDLL", return_value=object()):

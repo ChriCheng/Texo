@@ -16,6 +16,8 @@ class NativeDesktopTests(unittest.TestCase):
         self.panel.set_format.side_effect = lambda value: setattr(self.panel.get_format, "return_value", value)
         self.panel.get_result.return_value = ""
         self.panel.set_result.side_effect = lambda text, **options: setattr(self.panel.get_result, "return_value", text)
+        self.statusbar.get_copy_mode.return_value = 0
+        self.statusbar.set_copy_mode.side_effect = lambda value: setattr(self.statusbar.get_copy_mode, "return_value", value)
         self.statusbar.get_shortcuts.return_value = [
             dict(key_code=37, modifiers=256, label="⌘L"),
             dict(key_code=41, modifiers=768, label="⌘⇧;"),
@@ -233,10 +235,11 @@ class NativeDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.shortcuts_active)
 
     def test_ppt_copy_uses_current_edited_text_and_native_rich_clipboard(self):
+        self.statusbar.get_copy_mode.return_value = 1
         self.panel.get_result.return_value = "中文 $x^2$"
         payload = dict(plain="中文 $x^2$", html="<p>中文 <math>x</math></p>")
         with patch("texo.office.make_office_payload", return_value=payload) as convert, patch("texo.desktop.Thread", side_effect=lambda target, daemon: SimpleNamespace(start=target)):
-            self.window.copy_ppt()
+            self.window.copy()
             self.window.poll()
         convert.assert_called_once_with("中文 $x^2$", pure_latex=False)
         self.panel.copy_office.assert_called_once_with(payload)
@@ -244,13 +247,61 @@ class NativeDesktopTests(unittest.TestCase):
         self.assertFalse(self.window.busy)
 
     def test_failed_ppt_conversion_does_not_touch_clipboard(self):
+        self.statusbar.get_copy_mode.return_value = 1
         self.panel.get_result.return_value = "中文 $x^2$"
         with patch("texo.office.make_office_payload", side_effect=RuntimeError("无法转换公式")), patch("texo.desktop.Thread", side_effect=lambda target, daemon: SimpleNamespace(start=target)):
-            self.window.copy_ppt()
+            self.window.copy()
             self.window.poll()
         self.panel.copy_office.assert_not_called()
         self.root.clipboard_clear.assert_not_called()
         self.assertFalse(self.window.busy)
+        self.panel.set_status.assert_called_with("PPT 复制失败：无法转换公式")
+        self.panel.show.assert_called_once_with()
+
+    def test_copy_choice_changes_preference_and_button_without_copying(self):
+        for event, mode in ((41, 1), (40, 0)):
+            self.window.events.put(event)
+            self.window.poll()
+            self.statusbar.set_copy_mode.assert_called_with(mode)
+            self.panel.set_copy_mode.assert_called_with(mode)
+        self.root.clipboard_clear.assert_not_called()
+        self.panel.copy_office.assert_not_called()
+        self.panel.show.assert_not_called()
+
+    def test_automatic_ppt_copy_waits_for_conversion_before_copy_and_show(self):
+        self.statusbar.get_copy_mode.return_value = 1
+        self.window.result_mode = 1
+        pending = []
+        payload = dict(plain="$$x^2$$", html="<math>x</math>")
+        order = []
+        self.panel.copy_office.side_effect = lambda value: order.append("copy") or True
+        self.panel.show.side_effect = lambda: order.append("show")
+        self.window.events.put(("result", "x^2\n", 1, None))
+        with patch("texo.office.make_office_payload", return_value=payload) as convert, patch("texo.desktop.Thread", side_effect=lambda target, daemon: SimpleNamespace(start=lambda: pending.append(target))):
+            self.window.poll()
+            self.assertTrue(self.window.busy)
+            self.assertEqual(order, [])
+            self.panel.reset_undo.assert_called_once_with()
+            self.statusbar.get_copy_mode.return_value = 0
+            self.assertFalse(self.window.copy())
+            self.assertEqual(len(pending), 1)
+            pending[0]()
+            self.window.poll()
+        convert.assert_called_once_with("$$x^2$$", pure_latex=True)
+        self.assertEqual(order, ["copy", "show"])
+        self.assertFalse(self.window.busy)
+        self.root.clipboard_clear.assert_not_called()
+        self.panel.set_status.assert_called_with("PPT 内容已自动复制，可直接粘贴到 PowerPoint。")
+
+    def test_failed_automatic_ppt_copy_shows_result_without_success_message(self):
+        self.statusbar.get_copy_mode.return_value = 1
+        self.window.events.put(("result", "中文 $x$", 1, None))
+        with patch("texo.office.make_office_payload", side_effect=RuntimeError("无法转换公式")), patch("texo.desktop.Thread", side_effect=lambda target, daemon: SimpleNamespace(start=target)):
+            self.window.poll()
+        self.panel.copy_office.assert_not_called()
+        self.root.clipboard_clear.assert_not_called()
+        self.assertFalse(self.window.busy)
+        self.panel.show.assert_called_once_with()
         self.panel.set_status.assert_called_with("PPT 复制失败：无法转换公式")
 
     def test_native_ppt_write_failure_is_reported_without_claiming_preservation(self):

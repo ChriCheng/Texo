@@ -13,7 +13,7 @@ typedef void (*TexoStatusCallback)(int);
 @property(nonatomic, strong) NSImage *normalImage;
 @property(nonatomic, strong) NSTimer *progressTimer;
 @property(nonatomic, assign) double progress;
-@property(nonatomic, assign) double phase;
+@property(nonatomic, assign) double targetProgress;
 @property(nonatomic, assign) TexoStatusCallback callback;
 - (NSMenuItem *)addItem:(NSString *)title tag:(NSInteger)tag to:(NSMenu *)menu key:(NSString *)key modifiers:(NSEventModifierFlags)modifiers;
 - (void)drawProgress;
@@ -36,7 +36,6 @@ typedef void (*TexoStatusCallback)(int);
 }
 - (void)drawProgress {
     double progress = self.progress;
-    double phase = self.phase;
     NSImage *image = [NSImage imageWithSize:NSMakeSize(18, 18) flipped:NO drawingHandler:^BOOL(NSRect __unused rect) {
         [NSColor.blackColor set];
         NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(2, 2, 14, 14)];
@@ -44,12 +43,10 @@ typedef void (*TexoStatusCallback)(int);
         [circle stroke];
         if (progress >= 1) {
             [circle fill];
-        } else if (progress > 0 || progress == -2) {
-            CGFloat start = progress == -2 ? 90 - phase : 90;
-            CGFloat end = start - (progress == -2 ? 75 : 360 * progress);
+        } else if (progress > 0) {
             NSBezierPath *sector = [NSBezierPath bezierPath];
             [sector moveToPoint:NSMakePoint(9, 9)];
-            [sector appendBezierPathWithArcWithCenter:NSMakePoint(9, 9) radius:7 startAngle:start endAngle:end clockwise:YES];
+            [sector appendBezierPathWithArcWithCenter:NSMakePoint(9, 9) radius:7 startAngle:90 endAngle:90 - 360 * progress clockwise:YES];
             [sector closePath];
             [sector fill];
         }
@@ -59,8 +56,14 @@ typedef void (*TexoStatusCallback)(int);
     self.item.button.image = image;
 }
 - (void)animateProgress:(NSTimer *)timer {
-    self.phase = fmod(self.phase + 24, 360);
+    // Smooth only work already confirmed by the OCR worker.
+    double remaining = self.targetProgress - self.progress;
+    self.progress = remaining <= 0.002 ? self.targetProgress : self.progress + remaining * 0.35;
     [self drawProgress];
+    if (self.progress >= self.targetProgress) {
+        [timer invalidate];
+        self.progressTimer = nil;
+    }
 }
 @end
 
@@ -121,6 +124,8 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
     controller = [[TexoStatusController alloc] init];
     controller.callback = callback;
+    controller.progress = -1;
+    controller.targetProgress = -1;
     controller.item = [NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
     NSString *project = [NSBundle.mainBundle objectForInfoDictionaryKey:@"TexoProjectRoot"];
     NSImage *image = project ? [[NSImage alloc] initWithContentsOfFile:[project stringByAppendingPathComponent:@"assets/svg/status-icon.svg"]] : nil;
@@ -185,19 +190,32 @@ void TexoSetRecognitionProgress(double value, const char *label) {
     if (!NSThread.isMainThread || !controller) {
         return;
     }
-    [controller.progressTimer invalidate];
-    controller.progressTimer = nil;
-    if (value != -2 && (value < 0 || !isfinite(value))) {
+    if (value == -2) {
+        [controller.progressTimer invalidate];
+        controller.progressTimer = nil;
+        return;
+    }
+    if (value < 0 || !isfinite(value)) {
+        [controller.progressTimer invalidate];
+        controller.progressTimer = nil;
+        controller.progress = -1;
+        controller.targetProgress = -1;
         controller.item.button.image = controller.normalImage;
         controller.item.button.toolTip = defaultTooltip;
         return;
     }
-    controller.progress = value == -2 ? -2 : fmin(1, value);
+    if (value == 0 || controller.progress < 0) {
+        [controller.progressTimer invalidate];
+        controller.progressTimer = nil;
+        controller.progress = 0;
+        controller.targetProgress = 0;
+        [controller drawProgress];
+    }
+    controller.targetProgress = fmax(controller.targetProgress, fmin(1, value));
     NSString *text = label ? [NSString stringWithUTF8String:label] : nil;
     controller.item.button.toolTip = text.length ? [@"Texo · " stringByAppendingString:text] : @"Texo · 正在识别";
-    [controller drawProgress];
-    if (value == -2) {
-        controller.progressTimer = [NSTimer timerWithTimeInterval:0.1 target:controller selector:@selector(animateProgress:) userInfo:nil repeats:YES];
+    if (controller.progress < controller.targetProgress && !controller.progressTimer) {
+        controller.progressTimer = [NSTimer timerWithTimeInterval:1.0 / 30 target:controller selector:@selector(animateProgress:) userInfo:nil repeats:YES];
         [NSRunLoop.mainRunLoop addTimer:controller.progressTimer forMode:NSRunLoopCommonModes];
     }
 }

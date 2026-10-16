@@ -56,14 +56,16 @@ def recognize(image_path, model_dir=ROOT / "model", mode="formula", progress=Non
     import torch
 
     if progress:
-        progress(None, "正在准备公式模型…")
+        progress(0, "正在准备公式模型…")
     model, tokenizer, processor = load_model(Path(model_dir).resolve())
     if progress:
-        progress(None, "正在识别公式…")
+        progress(1 / 3, "正在识别公式…")
     with torch.inference_mode():
         tokens = model.generate(pixel_values=processor(image).unsqueeze(0), do_sample=False)
     if tokens.shape[-1] >= model.generation_config.max_length:
         raise ValueError("公式超过模型输出长度限制，请裁剪成更小的公式后重试。")
+    if progress:
+        progress(2 / 3, "正在整理公式结果…")
     latex = normalize_latex(tokenizer.batch_decode(tokens, skip_special_tokens=True)[0])
     if not latex:
         raise ValueError("未识别出公式，请检查图片并重新裁剪。")

@@ -31,13 +31,16 @@ menu; its show/hide item or global Command-Shift-semicolon toggles the popover.
 Escape or an outside click hides it without quitting. Global Command-L starts
 region selection. File, clipboard and screenshot recognition keep the popover
 hidden during OCR by default; users can still request progress. Success shows
-and automatically copies the completed result. Failure or cancellation
-preserves the clipboard. Shortcut rebinding is not yet available.
+and automatically copies the completed result. Single-formula results display
+the selected copy delimiters; changing the format rewraps the current edits.
+Failure or cancellation preserves the clipboard. Shortcut rebinding is not yet
+available.
 
 **Recognition activity**: A pie-style menu-bar indicator replaces the normal
-four-corner formula icon while recognition runs. It reflects completed phases;
-unknown-length phases rotate without claiming an exact percentage. Completion,
-failure and cancellation restore the normal icon.
+four-corner formula icon only after image acquisition, while recognition runs.
+Its sector smoothly fills to completed processing stages (or formula regions
+in mixed mode), holds while the current stage runs, and never estimates time.
+Completion, failure and cancellation restore the normal icon.
 
 **Login startup**: Opens Texo.app in the background after login, with the popover
 hidden. Quitting does not restart the app immediately and leaves the next-login

@@ -21,7 +21,7 @@ class InferenceTests(unittest.TestCase):
         expected = "x^{2}+y^{2}=z^{2}"
         progress = []
         self.assertEqual("".join(recognize(path, progress=lambda value, label: progress.append(value)).split()), expected)
-        self.assertEqual(progress, [None, None, 1])
+        self.assertEqual(progress, [0, 1 / 3, 2 / 3, 1])
         with Image.open(path) as source:
             pixel = source.getpixel((0, 0))
             self.assertEqual("".join(recognize(source).split()), expected)

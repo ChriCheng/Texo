@@ -145,7 +145,11 @@ typedef void (*TexoPopoverCallback)(int);
     }
 }
 - (void)formatChanged:(id)sender {
-    TexoSetCopyFormat((int)self.format.indexOfSelectedItem);
+    int format = (int)self.format.indexOfSelectedItem;
+    TexoSetCopyFormat(format);
+    if (self.callback) {
+        self.callback(10 + format);
+    }
 }
 - (void)textDidChange:(NSNotification *)notification {
     [self refreshControls];

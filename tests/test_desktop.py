@@ -13,6 +13,7 @@ class NativeDesktopTests(unittest.TestCase):
         self.root, self.panel, self.statusbar = Mock(), Mock(), Mock()
         self.panel.get_mode.return_value = 0
         self.panel.get_format.return_value = 2
+        self.panel.set_format.side_effect = lambda value: setattr(self.panel.get_format, "return_value", value)
         self.panel.get_result.return_value = ""
         self.panel.set_result.side_effect = lambda text: setattr(self.panel.get_result, "return_value", text)
         for name, result in (("NativePopover", self.panel), ("StatusBar", self.statusbar), ("GlobalHotkey", Mock()), ("login_enabled", False)):
@@ -33,14 +34,14 @@ class NativeDesktopTests(unittest.TestCase):
         self.assertTrue(self.window.busy)
         self.panel.show.assert_not_called()
         self.root.clipboard_clear.assert_not_called()
-        self.statusbar.set_progress.assert_called_with(-2, "正在识别 测试…")
+        self.statusbar.set_progress.assert_called_with(0, "正在识别 测试…")
         self.window.poll()
         self.assertFalse(self.window.busy)
         self.assertEqual(order, [("copy", "$$x^2$$"), ("show", None)])
         self.statusbar.set_progress.assert_called_with(-1)
 
     def test_result_classification_uses_formula_format_only_without_prose(self):
-        for result, expected, mode in (("$$x^2$$\n", "$$x^2$$", 1), (r"$$\text{price \$5}$$", r"$$\text{price \$5}$$", 1), ("说明 $x^2$\n", "说明 $x^2$", 0), ("$$x$$\n\n$$y$$", "$$x$$\n\n$$y$$", 0)):
+        for result, expected, mode in (("$$x^2$$\n", "$$x^2$$", 1), (r"$$\text{price \$5}$$", r"$$\text{price \$5}$$", 1), ("说明 $x^2$\n", "说明 $x^2$", 0), ("$$x$$\n\n$$y$$", "$$x$$\n\n$$y$$", 0), ("$", "$", 0)):
             with self.subTest(result=result):
                 self.window.result_mode = 0
                 self.window.events.put(("result", result, 1, None))
@@ -48,6 +49,54 @@ class NativeDesktopTests(unittest.TestCase):
                 self.root.clipboard_append.assert_called_with(expected)
                 self.assertEqual(self.window.result_mode, mode)
         self.panel.set_mode.assert_not_called()
+
+    def test_capture_selection_does_not_start_conversion_progress(self):
+        self.window.screenshot()
+        self.assertTrue(self.window.interaction_active)
+        self.statusbar.set_progress.assert_not_called()
+
+    def test_formula_result_display_matches_selected_copy_format(self):
+        self.window.result_mode = 1
+        self.window.events.put(("result", "x^2\n", 1, None))
+        self.window.poll()
+        self.assertEqual(self.panel.get_result(), "$$x^2$$")
+        self.root.clipboard_append.assert_called_with(self.panel.get_result())
+
+    def test_changing_format_rewraps_edited_result_and_copy_matches_display(self):
+        self.window.result_mode = 1
+        self.panel.get_result.return_value = r"$$x + \text{price \$5}$$" + "\n"
+        for index, expected in ((0, r"x + \text{price \$5}"), (1, r"$x + \text{price \$5}$"), (2, r"$$x + \text{price \$5}$$")):
+            with self.subTest(index=index):
+                self.window.events.put(index + 10)
+                self.window.poll()
+                self.assertEqual(self.panel.get_result(), expected)
+                self.window.copy()
+                self.assertEqual(self.panel.get_result(), expected)
+                self.root.clipboard_append.assert_called_with(expected)
+        self.panel.show.assert_not_called()
+
+    def test_format_change_preserves_mixed_markdown(self):
+        text = "中文 $x$\n\n$$y$$"
+        self.panel.get_result.return_value = text
+        self.window.events.put(10)
+        self.window.poll()
+        self.assertEqual(self.panel.get_result(), text)
+
+    def test_empty_formula_does_not_copy_or_accumulate_delimiters(self):
+        self.window.result_mode = 1
+        for text in ("", "\n", "$$", "$$$$"):
+            with self.subTest(text=text):
+                self.panel.get_result.return_value = text
+                self.assertFalse(self.window.copy())
+                self.assertEqual(self.panel.get_result(), "")
+        self.root.clipboard_clear.assert_not_called()
+
+    def test_unknown_progress_does_not_reset_completed_stages(self):
+        self.window.events.put(("progress", 0.5, "已完成检测", None))
+        self.window.events.put(("progress", None, "正在识别公式…", None))
+        self.window.poll()
+        self.statusbar.set_progress.assert_called_once_with(0.5, "已完成检测")
+        self.panel.set_status.assert_called_with("正在识别公式…")
 
     def test_explicit_view_during_clipboard_read_is_not_hidden_again(self):
         self.window.open_image.return_value = Image.new("RGB", (24, 16), "red")
@@ -71,7 +120,7 @@ class NativeDesktopTests(unittest.TestCase):
         self.window.events.put(("result", None, 0, "model failed"))
         self.window.poll()
         self.root.clipboard_clear.assert_not_called()
-        self.statusbar.set_progress.assert_any_call(-2, "正在识别公式…")
+        self.statusbar.set_progress.assert_called_once_with(-1)
         self.statusbar.set_progress.assert_called_with(-1)
         self.panel.show.assert_called_once_with()
 

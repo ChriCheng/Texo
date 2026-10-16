@@ -19,10 +19,8 @@ def nearest_text_row(rows, box):
 
 def recognize_mixed(image, recognize_formula, progress=None):
     if progress:
-        progress(None, "正在检测公式…")
+        progress(0, "正在检测公式…")
     formulas = detect_formulas(image)
-    if progress:
-        progress(1 / (len(formulas) + 2), f"检测完成 · {len(formulas)} 个公式")
     masked = image.copy()
     draw = ImageDraw.Draw(masked)
     parts = []
@@ -30,17 +28,15 @@ def recognize_mixed(image, recognize_formula, progress=None):
         box = formula["box"]
         draw.rectangle(box, fill="white")
         if progress:
-            progress(None, f"正在识别公式 {index + 1}/{len(formulas)}…")
+            progress((index + 1) / (len(formulas) + 2), f"正在识别公式 {index + 1}/{len(formulas)}…")
         latex = recognize_formula(image.crop(box))
-        if progress:
-            progress((index + 2) / (len(formulas) + 2), f"已识别 {index + 1}/{len(formulas)} 个公式")
         delimiter = "$$" if formula["type"] == "isolated" else "$"
         parts.append({**formula, "text": f"{delimiter}{latex.strip()}{delimiter}"})
 
     # shortcut: Single-column reading order; use page layout detection for columns/tables.
     rows = []
     if progress:
-        progress(None, "正在识别文字…")
+        progress((len(formulas) + 1) / (len(formulas) + 2), "正在识别文字…")
     for line in sorted(recognize_text(masked), key=lambda line: line["box"][1]):
         part = {**line, "type": "text"}
         row = nearest_text_row(rows, part["box"])

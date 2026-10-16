@@ -115,9 +115,13 @@ both shortcuts. Custom shortcut rebinding is not implemented yet.
 
 The normal menu-bar icon uses the original logo's four scan corners and
 outlined formula, adapting to light or dark menu bars. During recognition it
-changes to a pie-style activity indicator: completed phases advance the
-indicator, and phases without a known length rotate without claiming a precise
-percentage. Completion, failure and cancellation restore the normal icon.
+changes to a pie-style progress indicator after image acquisition. The sector
+smoothly fills as processing stages or formula regions finish, then holds
+until the next stage completes. It shows completed work, not estimated time.
+Completion, failure and cancellation restore the normal icon. Single-formula
+results display the selected `LaTeX`, `$LaTeX$` or `$$LaTeX$$` format directly;
+changing the format keeps edits and updates the displayed delimiters. Copying
+uses the same text, without adding another pair of delimiters.
 
 Open the icon's menu and enable **设定 → 登录时自动启动** to launch Texo in the background
 after logging into this Mac. The popover stays hidden until requested. This

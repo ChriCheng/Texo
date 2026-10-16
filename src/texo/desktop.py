@@ -13,10 +13,10 @@ from texo.statusbar import StatusBar
 
 def _single_formula(text):
     for delimiter in ("$$", "$"):
-        if text.startswith(delimiter) and text.endswith(delimiter):
+        if len(text) >= 2 * len(delimiter) and text.startswith(delimiter) and text.endswith(delimiter):
             latex = text[len(delimiter):-len(delimiter)].strip()
             # Escaped dollars are formula text; unescaped dollars delimit other content.
-            if latex and not re.search(r"(?<!\\)(?:\\\\)*\$", latex):
+            if not re.search(r"(?<!\\)(?:\\\\)*\$", latex):
                 return latex
     return None
 
@@ -88,6 +88,7 @@ class NativeOCRWindow:
             if isinstance(event, int):
                 if 10 <= event <= 12:
                     self.panel.set_format(event - 10)
+                    self.format_result()
                     continue
                 if event in (20, 21):
                     self.panel.set_mode(event - 20)
@@ -124,7 +125,8 @@ class NativeOCRWindow:
                     self.panel.set_status(f"识别完成 · {detail:.2f} 秒 · 已自动复制。")
                 self.show()
             elif kind == "progress":
-                self.statusbar.set_progress(-2 if value is None else value, detail)
+                if value is not None:
+                    self.statusbar.set_progress(value, detail)
                 self.panel.set_status(detail)
             elif kind == "login":
                 self.login_busy = False
@@ -149,7 +151,6 @@ class NativeOCRWindow:
         self.panel.hide(immediately=True)
         self.interaction_active = capture
         self.set_busy(True)
-        self.statusbar.set_progress(-2, "等待框选截图" if capture else "正在读取剪贴板…")
         self.panel.set_status("请框选文字或公式，Esc 取消。" if capture else "正在读取剪贴板…")
         events = self.events
 
@@ -203,7 +204,7 @@ class NativeOCRWindow:
         self.panel.set_result("")
         self.panel.set_status(f"正在识别 {label}…")
         self.set_busy(True)
-        self.statusbar.set_progress(-2, f"正在识别 {label}…")
+        self.statusbar.set_progress(0, f"正在识别 {label}…")
         events, recognize, model_dir = self.events, self.recognize, self.model_dir
         mode = "mixed" if self.result_mode == 0 else "formula"
 
@@ -217,12 +218,20 @@ class NativeOCRWindow:
 
         Thread(target=worker, daemon=True).start()
 
-    def copy(self, automatic=False):
-        text = self.panel.get_result().strip()
+    def format_result(self):
+        current = self.panel.get_result()
+        text = current.strip()
         if self.result_mode == 1:
-            text = normalize_latex(text)
+            formula = _single_formula(text)
+            text = normalize_latex(text if formula is None else formula)
             delimiter = ("", "$", "$$")[self.panel.get_format()]
             text = f"{delimiter}{text}{delimiter}" if text else ""
+        if text != current:
+            self.panel.set_result(text)
+        return text
+
+    def copy(self, automatic=False):
+        text = self.format_result()
         if text:
             try:
                 self.root.clipboard_clear()

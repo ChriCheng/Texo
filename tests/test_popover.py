@@ -62,15 +62,11 @@ class NativePopoverTests(unittest.TestCase):
         self.assertEqual(popover.get_format(), 2)
         popover.set_mode(1)
         popover.set_format(0)
-        popover.set_copy_mode(1)
         self.library.TexoPopoverSetMode.assert_called_once_with(1)
         self.library.TexoPopoverSetFormat.assert_called_once_with(0)
-        self.library.TexoPopoverSetCopyMode.assert_called_once_with(1)
         popover.close()
         popover.set_format(1)
-        popover.set_copy_mode(0)
         self.library.TexoPopoverSetFormat.assert_called_once_with(0)
-        self.library.TexoPopoverSetCopyMode.assert_called_once_with(1)
 
     def test_missing_launcher_symbols_explains_how_to_start(self):
         with patch("texo.popover.ctypes.CDLL", return_value=object()):
@@ -124,8 +120,8 @@ class NativePopoverTests(unittest.TestCase):
     def test_office_payload_crosses_native_boundary_before_copy(self):
         popover = NativePopover(lambda event: None)
         self.library.TexoCopyOffice.return_value = True
-        self.assertTrue(popover.copy_office(dict(plain="中文 $x$", html="<p>中文</p>", mathml="<math/>")))
-        self.library.TexoCopyOffice.assert_called_once_with("中文 $x$".encode(), "<p>中文</p>".encode())
+        self.assertTrue(popover.copy_office(dict(plain="中文 $x$", html="<p>中文</p>")))
+        self.library.TexoCopyOffice.assert_called_once_with("<p>中文</p>".encode())
         popover.close()
         self.assertFalse(popover.copy_office({}))
 

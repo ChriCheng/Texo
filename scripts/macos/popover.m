@@ -4,7 +4,6 @@
 extern void *TexoStatusItemButton(void);
 extern int TexoGetCopyFormat(void);
 extern void TexoSetCopyFormat(int format);
-extern int TexoGetCopyMode(void);
 extern int TexoGetRecognitionMode(void);
 extern void TexoSetRecognitionMode(int mode);
 typedef void (*TexoPopoverCallback)(int);
@@ -62,6 +61,7 @@ typedef void (*TexoPopoverCallback)(int);
 @property(nonatomic, strong) NSPopUpButton *mode;
 @property(nonatomic, strong) NSPopUpButton *format;
 @property(nonatomic, strong) NSButton *resultCopyButton;
+@property(nonatomic, strong) NSButton *pptCopyButton;
 @property(nonatomic, strong) NSArray<NSButton *> *inputButtons;
 @property(nonatomic, copy) NSString *resultSnapshot;
 @property(nonatomic, assign) TexoPopoverCallback callback;
@@ -69,7 +69,6 @@ typedef void (*TexoPopoverCallback)(int);
 @property(nonatomic, assign) int resultMode;
 - (void)refreshControls;
 - (void)focusResult;
-- (void)configureCopyButton:(int)mode;
 @end
 
 @implementation TexoPopoverController
@@ -133,8 +132,10 @@ typedef void (*TexoPopoverCallback)(int);
     NSButton *capture = [self button:@"截图 ⌘L" frame:NSMakeRect(130, 52, 108, 32) event:2];
     NSButton *clipboard = [self button:@"识别剪贴板" frame:NSMakeRect(244, 52, 120, 32) event:3];
     self.inputButtons = @[choose, capture, clipboard];
-    self.resultCopyButton = [self button:@"复制结果" frame:NSMakeRect(620, 52, 124, 32) event:7];
-    [self configureCopyButton:TexoGetCopyMode()];
+    self.resultCopyButton = [self button:@"复制公式" frame:NSMakeRect(628, 52, 116, 32) event:7];
+    self.resultCopyButton.toolTip = @"复制当前编辑后的识别结果。";
+    self.pptCopyButton = [self button:@"复制到 PPT" frame:NSMakeRect(500, 52, 124, 32) event:9];
+    self.pptCopyButton.toolTip = @"将当前编辑后的识别结果复制为适合 PowerPoint 粘贴的内容。";
 
     self.mode = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 10, 150, 30) pullsDown:NO];
     [self.mode addItemsWithTitles:@[@"中文与公式", @"公式"]];
@@ -190,11 +191,6 @@ typedef void (*TexoPopoverCallback)(int);
     // The popover creates and animates its own window; focus it once ready.
     [self focusResult];
 }
-- (void)configureCopyButton:(int)mode {
-    self.resultCopyButton.title = mode == 1 ? @"复制到 PPT" : @"复制结果";
-    self.resultCopyButton.accessibilityLabel = self.resultCopyButton.title;
-    self.resultCopyButton.toolTip = mode == 1 ? @"复制为适合 PowerPoint 粘贴的内容。" : @"复制当前识别结果。";
-}
 - (void)refreshControls {
     for (NSButton *button in self.inputButtons) {
         button.enabled = !self.busy;
@@ -203,6 +199,7 @@ typedef void (*TexoPopoverCallback)(int);
     self.format.enabled = !self.busy && self.resultMode == 1;
     self.result.editable = !self.busy;
     self.resultCopyButton.enabled = !self.busy && [self.result.string stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].length > 0;
+    self.pptCopyButton.enabled = self.resultCopyButton.enabled;
 }
 @end
 
@@ -301,13 +298,6 @@ void TexoPopoverSetCaptureShortcut(const char *label) {
         button.title = [@"截图 " stringByAppendingString:shortcut.length ? shortcut : @"⌘L"];
         button.accessibilityLabel = button.title;
         button.toolTip = button.title;
-    }
-}
-
-__attribute__((visibility("default")))
-void TexoPopoverSetCopyMode(int mode) {
-    if (NSThread.isMainThread && popoverController && (mode == 0 || mode == 1)) {
-        [popoverController configureCopyButton:mode];
     }
 }
 

@@ -189,7 +189,7 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
     [controller addItem:@"识别剪贴板" tag:3 to:controller.menu key:@"" modifiers:0];
     [controller.menu addItem:NSMenuItem.separatorItem];
     [controller addItem:@"显示／收起结果" tag:1 to:controller.menu key:@";" modifiers:NSEventModifierFlagCommand | NSEventModifierFlagShift];
-    [controller addItem:@"复制结果" tag:7 to:controller.menu key:@"" modifiers:0];
+    [controller addItem:@"复制结果" tag:42 to:controller.menu key:@"" modifiers:0];
     [controller.menu addItem:NSMenuItem.separatorItem];
     NSMenuItem *modeTitle = [[NSMenuItem alloc] initWithTitle:@"识别模式" action:nil keyEquivalent:@""];
     modeTitle.enabled = NO;
@@ -199,7 +199,7 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
         [controller addItem:@"公式" tag:21 to:controller.menu key:@"" modifiers:0]
     ];
     [controller.menu addItem:NSMenuItem.separatorItem];
-    NSMenuItem *copyModeTitle = [[NSMenuItem alloc] initWithTitle:@"复制方式" action:nil keyEquivalent:@""];
+    NSMenuItem *copyModeTitle = [[NSMenuItem alloc] initWithTitle:@"默认复制方式" action:nil keyEquivalent:@""];
     copyModeTitle.enabled = NO;
     [controller.menu addItem:copyModeTitle];
     controller.clipboardModeItems = @[

@@ -9,12 +9,14 @@ and formula screenshots into Markdown on macOS.
 
 **Copy format**: The recognition result copied as plain LaTeX, inline math enclosed in single dollar signs, or display math enclosed in double dollar signs. The native app defaults to display math and remembers the selection. No format includes a trailing newline.
 
-**Copy mode**: A saved, mutually exclusive choice between ordinary text copy
-(the default) and PPT copy, used by both manual and automatic copy.
+**Copy mode**: A saved, mutually exclusive default for automatic copy and the
+menu's copy action. The result panel has separate text and PPT copy buttons
+that always use their named format and the current edited result.
 
 **PPT copy**: Preserves prose and converts formula source in the result into
 rich content for PowerPoint's editable equations. Ordinary copy keeps the
-selected LaTeX or Markdown text.
+selected LaTeX or Markdown text. PPT copy supplies formula-rich HTML without a
+plain LaTeX fallback; the text button supplies the source for math renderers.
 
 **Result editing**: Standard text selection, copy, cut, paste, undo and redo
 within the focused result editor, including undo of manual edits and format

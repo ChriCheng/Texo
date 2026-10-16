@@ -66,6 +66,34 @@ class OfficePayloadTests(unittest.TestCase):
                 self.assertEqual(math.find(".//{http://www.w3.org/1998/Math/MathML}annotation").text.strip(), formula)
 
     @unittest.skipUnless(shutil.which("pandoc"), "requires the local Pandoc converter")
+    def test_mixed_aliases_convert_without_changing_plain_text(self):
+        for opening, closing in (("$", "$"), ("$$", "$$"), (r"\(", r"\)"), (r"\[", r"\]")):
+            source = rf"前文 {opening}\Theta_0\cap\Theta_1=\empty{closing} 后文"
+            with self.subTest(source=source):
+                payload = make_office_payload(source)
+                self.assertEqual(payload["plain"], source)
+                self.assertEqual(len(math_nodes(payload)), 1)
+                self.assertIn("∅", payload["html"])
+
+    @unittest.skipUnless(shutil.which("pandoc"), "requires the local Pandoc converter")
+    def test_pure_aliases_convert_without_changing_plain_text(self):
+        for source in (r"\empty", r"$\empty$", r"$$\empty$$", r"\(\empty\)", r"\[\empty\]"):
+            with self.subTest(source=source):
+                payload = make_office_payload(source, pure_latex=True)
+                self.assertEqual(payload["plain"], source)
+                self.assertEqual(len(math_nodes(payload)), 1)
+                self.assertIn("∅", payload["html"])
+
+    def test_alias_normalization_stays_inside_unescaped_math_wrappers(self):
+        source = r"正文 \empty 与 \emptyFoo；价格 \$100，原文 \$\empty\$。$\emptyFoo+\empty$ $$\empty$$ \(\empty\) \[\empty\] $\text{cost \$5}+\empty$ \\\(\empty\\\) \\(\empty\\) \\$\empty$"
+        expected = r"正文 \empty 与 \emptyFoo；价格 \$100，原文 \$\empty\$。$\emptyFoo+\emptyset$ $$\emptyset$$ \(\emptyset\) \[\emptyset\] $\text{cost \$5}+\emptyset$ \\\(\emptyset\\\) \\(\empty\\) \\$\emptyset$"
+        converted = subprocess.CompletedProcess([], 0, "<p>正文</p>", "")
+        with patch("texo.office._pandoc", return_value="pandoc"), patch("texo.office.subprocess.run", return_value=converted) as run:
+            payload = make_office_payload(source)
+        self.assertEqual(run.call_args.kwargs["input"], expected)
+        self.assertEqual(payload["plain"], source)
+
+    @unittest.skipUnless(shutil.which("pandoc"), "requires the local Pandoc converter")
     def test_raw_html_and_remote_resources_are_not_executable_or_fetchable(self):
         source = '<script>alert(1)</script>\n![远程图](https://example.com/a.png)\n[链接](https://example.com/) $x$'
         payload = make_office_payload(source)
@@ -78,8 +106,10 @@ class OfficePayloadTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("pandoc"), "requires the local Pandoc converter")
     def test_unsupported_formula_fails_instead_of_copying_unrendered_source(self):
-        with self.assertRaisesRegex(RuntimeError, "公式|转换"):
+        with self.assertRaisesRegex(RuntimeError, r"不支持命令 \\thiscommanddoesnotexist.*剪贴板未修改") as raised:
             make_office_payload(r"前文 $\thiscommanddoesnotexist{x}$ 后文")
+        self.assertIsNotNone(raised.exception.__cause__)
+        self.assertIn(r"unexpected control sequence \thiscommanddoesnotexist", str(raised.exception.__cause__))
 
     @unittest.skipUnless(shutil.which("pandoc"), "requires the local Pandoc converter")
     def test_unconverted_math_fails_but_prose_and_currency_remain_valid(self):

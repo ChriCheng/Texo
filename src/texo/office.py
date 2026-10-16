@@ -9,8 +9,16 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 
+from texo.latex import normalize_latex
+
 
 _MATH = re.compile(r"<math\b.*?</math>", re.DOTALL)
+# Consume escapes outside formulas so escaped delimiters cannot start math.
+_MATH_SOURCE = re.compile(
+    r"(?P<math>\$\$(?:\\.|[^\\$]|\$(?!\$))*\$\$"
+    r"|(?<!\$)\$(?!\$)(?:\\.|[^\\$\n])+\$(?!\$)"
+    r"|\\\((?:\\(?!\)).|[^\\])*\\\)"
+    r"|\\\[(?:\\(?!\]).|[^\\])*\\\])|\\.", re.DOTALL)
 _HTML_TAGS = set("p br span div em strong code pre ul ol li blockquote hr h1 h2 h3 h4 h5 h6 table thead tbody tr th td del sup sub dl dt dd a".split())
 _RESOURCES = {"img", "script", "style", "iframe", "object", "embed", "video", "audio", "source", "link", "meta", "base"}
 
@@ -65,16 +73,18 @@ def _unwrap_latex(text):
 
 
 def make_office_payload(text, pure_latex=False):
-    """Return HTML with native MathML and the unchanged plain-text alternative.
+    """Return MathML HTML and the unchanged editor text for verification.
 
     Callers must finish this conversion before replacing the clipboard. The
-    HTML carries Chinese prose and native MathML; pure_latex accepts raw LaTeX
+    Only HTML is written by PPT copy. It carries prose and native MathML;
+    pure_latex accepts raw LaTeX
     or one of the four math wrappers. Import depends on the Office version.
     """
     plain = text.strip()
     if not plain:
         raise ValueError("结果为空，请先识别图片。")
-    source = f"$$\n{_unwrap_latex(plain)}\n$$" if pure_latex else plain
+    source = (f"$$\n{normalize_latex(_unwrap_latex(plain))}\n$$" if pure_latex else
+              _MATH_SOURCE.sub(lambda match: normalize_latex(match[0]) if match["math"] else match[0], plain))
     command = [_pandoc(), "--from=markdown+tex_math_dollars+tex_math_single_backslash+hard_line_breaks-raw_html-raw_tex",
                "--to=html5", "--mathml", "--wrap=none", "--fail-if-warnings", "--sandbox"]
     try:
@@ -84,6 +94,9 @@ def make_office_payload(text, pure_latex=False):
     except OSError as error:
         raise RuntimeError(f"无法运行 PPT 公式转换：{error}。剪贴板未修改。") from error
     if result.returncode:
+        unsupported = re.search(r"unexpected control sequence (\\[A-Za-z]+)", result.stderr)
+        if unsupported:
+            raise RuntimeError(f"不支持命令 {unsupported[1]}；请改写后重试。剪贴板未修改。") from RuntimeError(result.stderr.strip())
         raise RuntimeError(f"PPT 公式转换失败，剪贴板未修改：{result.stderr.strip()[:600]}")
     fragment = _OfficeHTML()
     fragment.feed(result.stdout)

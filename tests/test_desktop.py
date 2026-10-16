@@ -246,6 +246,26 @@ class NativeDesktopTests(unittest.TestCase):
         self.root.clipboard_clear.assert_not_called()
         self.assertFalse(self.window.busy)
 
+    def test_plain_button_copies_edits_even_when_default_is_ppt(self):
+        self.statusbar.get_copy_mode.return_value = 1
+        self.panel.get_result.return_value = "修改后中文 $x^2$"
+        with patch("texo.desktop.Thread", side_effect=lambda target, daemon: SimpleNamespace(start=target)):
+            self.window.events.put(7)
+            self.window.poll()
+        self.root.clipboard_append.assert_called_once_with("修改后中文 $x^2$")
+        self.panel.copy_office.assert_not_called()
+
+    def test_ppt_button_copies_edits_even_when_default_is_plain(self):
+        self.statusbar.get_copy_mode.return_value = 0
+        self.panel.get_result.return_value = "修改后中文 $y^2$"
+        payload = dict(plain="修改后中文 $y^2$", html="<p>修改后中文 <math>y</math></p>")
+        with patch("texo.office.make_office_payload", return_value=payload) as convert, patch("texo.desktop.Thread", side_effect=lambda target, daemon: SimpleNamespace(start=target)):
+            self.window.events.put(9)
+            self.window.poll()
+        convert.assert_called_once_with("修改后中文 $y^2$", pure_latex=False)
+        self.panel.copy_office.assert_called_once_with(payload)
+        self.root.clipboard_clear.assert_not_called()
+
     def test_failed_ppt_conversion_does_not_touch_clipboard(self):
         self.statusbar.get_copy_mode.return_value = 1
         self.panel.get_result.return_value = "中文 $x^2$"
@@ -258,12 +278,11 @@ class NativeDesktopTests(unittest.TestCase):
         self.panel.set_status.assert_called_with("PPT 复制失败：无法转换公式")
         self.panel.show.assert_called_once_with()
 
-    def test_copy_choice_changes_preference_and_button_without_copying(self):
+    def test_copy_choice_changes_default_without_copying(self):
         for event, mode in ((41, 1), (40, 0)):
             self.window.events.put(event)
             self.window.poll()
             self.statusbar.set_copy_mode.assert_called_with(mode)
-            self.panel.set_copy_mode.assert_called_with(mode)
         self.root.clipboard_clear.assert_not_called()
         self.panel.copy_office.assert_not_called()
         self.panel.show.assert_not_called()

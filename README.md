@@ -204,19 +204,22 @@ and **Command-Shift-Z** while it has keyboard focus. Manual edits and changes
 to copy delimiters can be undone. Each new recognition starts a new undo history.
 
 All settings appear directly in the icon's menu, with separators between groups.
-Under **复制方式**, check **普通复制** (the default) or **PPT 专用复制**.
-The two choices are mutually exclusive and survive restart. Both the result
-panel's single copy button and recognition's automatic copy follow this choice.
-The menu's **复制结果** action follows it too; Command-C in the editor still copies
-the selected text normally.
+Under **默认复制方式**, check **普通复制** (the default) or **PPT 专用复制**.
+The two choices are mutually exclusive and survive restart. Recognition's
+automatic copy and the menu's **复制结果** action follow this choice.
+The result panel always provides **复制公式** for LaTeX/Markdown text and
+**复制到 PPT** for rich Office content. Both use the current edited result,
+independently of the default. Command-C in the editor copies selected text.
 Ordinary copy produces the selected LaTeX/Markdown text; PPT copy preserves
 Chinese prose and converts math into rich content with editable Office equations.
-The copy button changes to **复制到 PPT** in PPT mode. Manual copy uses the current
-edited result. The converter runs locally using Pandoc
+PPT copy supplies HTML with MathML without a raw LaTeX text fallback; use
+**复制公式** for Obsidian or other text editors. The converter runs locally using Pandoc
 (`brew install pandoc` if missing); a conversion error leaves the clipboard
 unchanged. Supported formula commands depend on Pandoc and PowerPoint's MathML
 importer. This is not a full LaTeX document compiler, and it does not transfer
 document themes or slide layouts.
+The empty-set alias `\empty` is normalized to `\emptyset`. Unsupported commands
+are named in the error message; conversion failure preserves the clipboard.
 
 `launch_macos.command` still opens the terminal-launched desktop window; closing
 that window quits that instance. Menu-bar residency and login startup belong to

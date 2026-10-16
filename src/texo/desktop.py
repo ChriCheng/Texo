@@ -139,7 +139,7 @@ class NativeOCRWindow:
             self.statusbar.set_progress(-1)
 
     def poll(self):
-        actions = {1: self.toggle, 2: self.screenshot, 3: self.clipboard, 4: self.toggle_login, 5: self.root.destroy, 6: self.choose, 7: self.copy, 30: self.open_shortcut_settings, 31: self.save_shortcut_settings, 32: self.cancel_shortcut_settings}
+        actions = {1: self.toggle, 2: self.screenshot, 3: self.clipboard, 4: self.toggle_login, 5: self.root.destroy, 6: self.choose, 7: lambda: self.copy(copy_mode=0), 9: lambda: self.copy(copy_mode=1), 42: self.copy, 30: self.open_shortcut_settings, 31: self.save_shortcut_settings, 32: self.cancel_shortcut_settings}
         while True:
             try:
                 event = self.events.get_nowait()
@@ -155,7 +155,6 @@ class NativeOCRWindow:
                     continue
                 if event in (40, 41):
                     self.statusbar.set_copy_mode(event - 40)
-                    self.panel.set_copy_mode(event - 40)
                     continue
                 if event in actions:
                     actions[event]()
@@ -307,13 +306,15 @@ class NativeOCRWindow:
             self.panel.set_result(text)
         return text
 
-    def copy(self, automatic=False):
+    def copy(self, automatic=False, copy_mode=None):
         if self.busy or self.shortcuts_active:
             return False
         text = self.format_result()
         if automatic:
             self.panel.reset_undo()
-        if text and self.statusbar.get_copy_mode() == 1:
+        if copy_mode is None:
+            copy_mode = self.statusbar.get_copy_mode()
+        if text and copy_mode == 1:
             pure_latex = self.result_mode == 1
             self.set_busy(True)
             self.panel.set_status("正在准备 PPT 复制…")

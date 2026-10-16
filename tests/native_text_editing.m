@@ -6,7 +6,6 @@
 void *TexoStatusItemButton(void) { return NULL; }
 int TexoGetCopyFormat(void) { return 2; }
 void TexoSetCopyFormat(int format) { }
-int TexoGetCopyMode(void) { return 0; }
 int TexoGetRecognitionMode(void) { return 1; }
 void TexoSetRecognitionMode(int mode) { }
 
@@ -22,6 +21,8 @@ void TexoSetRecognitionMode(int mode) { }
 @end
 
 static int failures;
+static int selectedAction;
+static void recordAction(int action) { selectedAction = action; }
 static void check(BOOL condition, const char *message) {
     fprintf(condition ? stdout : stderr, "%s %s\n", condition ? "PASS" : "FAIL", message);
     if (!condition) failures++;
@@ -77,28 +78,36 @@ int main(void) {
             TexoPopoverSetBusy(false);
             check([view.string isEqualToString:@"new OCR"] && !view.undoManager.canUndo, "new OCR baseline replaces text while busy and clears undo");
         }
-        NSUInteger removedButtons = 0;
+        NSButton *pptButton = nil;
+        NSUInteger formulaButtons = 0, pptButtons = 0;
         for (NSView *subview in popoverController.view.subviews) {
-            if ([subview isKindOfClass:NSButton.class] && subview.tag == 9) removedButtons++;
+            if ([subview isKindOfClass:NSButton.class]) {
+                if (subview.tag == 7) formulaButtons++;
+                if (subview.tag == 9) { pptButtons++; pptButton = (NSButton *)subview; }
+            }
         }
-        check(popoverController.resultCopyButton.tag == 7 && popoverController.resultCopyButton.enabled && removedButtons == 0,
-              "one result copy button replaces the separate PPT button");
-        check([popoverController.resultCopyButton.title isEqualToString:@"复制结果"], "copy caption initializes from the saved normal mode");
-        TexoPopoverSetCopyMode(1);
-        check([popoverController.resultCopyButton.title isEqualToString:@"复制到 PPT"] &&
-              [popoverController.resultCopyButton.accessibilityLabel isEqualToString:@"复制到 PPT"] &&
-              [popoverController.resultCopyButton.toolTip containsString:@"PowerPoint"], "PPT mode updates the copy caption and accessibility");
-        TexoPopoverSetCopyMode(-1);
-        TexoPopoverSetCopyMode(2);
-        check([popoverController.resultCopyButton.title isEqualToString:@"复制到 PPT"], "invalid copy modes leave the caption unchanged");
-        TexoPopoverSetCopyMode(0);
-        check([popoverController.resultCopyButton.title isEqualToString:@"复制结果"] &&
-              ![popoverController.resultCopyButton.toolTip containsString:@"PowerPoint"], "normal mode restores the copy caption and tooltip");
+        check(formulaButtons == 1 && pptButtons == 1 && popoverController.resultCopyButton.enabled && pptButton.enabled,
+              "formula and PPT each have one enabled copy button");
+        check([popoverController.resultCopyButton.title isEqualToString:@"复制公式"] &&
+              [popoverController.resultCopyButton.accessibilityLabel isEqualToString:@"复制公式"] &&
+              [popoverController.resultCopyButton.toolTip containsString:@"编辑"], "formula copy has a fixed caption and describes the current edited result");
+        check([pptButton.title isEqualToString:@"复制到 PPT"] &&
+              [pptButton.accessibilityLabel isEqualToString:@"复制到 PPT"] &&
+              [pptButton.toolTip containsString:@"编辑"], "PPT copy has a fixed caption and describes the current edited result");
+        TexoPopoverSetResult("edited formula");
+        popoverController.callback = recordAction;
+        [popoverController.resultCopyButton performClick:nil];
+        check(selectedAction == 7 && strcmp(TexoPopoverGetResult(), "edited formula") == 0, "formula button dispatches the current edited result");
+        [pptButton performClick:nil];
+        check(selectedAction == 9 && strcmp(TexoPopoverGetResult(), "edited formula") == 0, "PPT button dispatches the current edited result");
         TexoPopoverSetBusy(true);
-        check(!popoverController.resultCopyButton.enabled, "copy button is disabled while busy");
+        check(!popoverController.resultCopyButton.enabled && !pptButton.enabled, "both copy buttons are disabled while busy");
         TexoPopoverSetBusy(false);
         TexoPopoverSetResult("");
-        check(!popoverController.resultCopyButton.enabled, "copy button is disabled for an empty result");
+        check(!popoverController.resultCopyButton.enabled && !pptButton.enabled, "both copy buttons are disabled for an empty result");
+        TexoPopoverSetStatus("full diagnostic error");
+        check([popoverController.status.stringValue isEqualToString:@"full diagnostic error"] &&
+              [popoverController.status.toolTip isEqualToString:@"full diagnostic error"], "status tooltip preserves the complete diagnostic message");
         TexoPopoverSetCaptureShortcut("⌃⌥K");
         check([popoverController.inputButtons[1].title isEqualToString:@"截图 ⌃⌥K"] &&
               [popoverController.inputButtons[1].accessibilityLabel isEqualToString:@"截图 ⌃⌥K"], "capture button and accessibility reflect the configured shortcut");

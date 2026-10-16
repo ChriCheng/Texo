@@ -75,10 +75,10 @@ def _unwrap_latex(text):
 def make_office_payload(text, pure_latex=False):
     """Return MathML HTML and the unchanged editor text for verification.
 
-    Callers must finish this conversion before replacing the clipboard. The
-    Only HTML is written by PPT copy. It carries prose and native MathML;
-    pure_latex accepts raw LaTeX
-    or one of the four math wrappers. Import depends on the Office version.
+    Callers must finish this conversion before replacing the clipboard. HTML
+    carries prose and native MathML; plain is retained in Texo's private
+    pasteboard type for source editing. pure_latex accepts raw LaTeX or one of
+    the four math wrappers. Import depends on the Office version.
     """
     plain = text.strip()
     if not plain:

@@ -212,7 +212,9 @@ The result panel always provides **复制公式** for LaTeX/Markdown text and
 independently of the default. Command-C in the editor copies selected text.
 Ordinary copy produces the selected LaTeX/Markdown text; PPT copy preserves
 Chinese prose and converts math into rich content with editable Office equations.
-PPT copy supplies HTML with MathML without a raw LaTeX text fallback; use
+PPT copy supplies HTML with MathML and a Texo-private source representation;
+pasting it back into Texo restores the edited source. It does not supply a
+public raw LaTeX text fallback; use
 **复制公式** for Obsidian or other text editors. The converter runs locally using Pandoc
 (`brew install pandoc` if missing); a conversion error leaves the clipboard
 unchanged. Supported formula commands depend on Pandoc and PowerPoint's MathML

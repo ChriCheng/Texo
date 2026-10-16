@@ -17,6 +17,8 @@ that always use their named format and the current edited result.
 rich content for PowerPoint's editable equations. Ordinary copy keeps the
 selected LaTeX or Markdown text. PPT copy supplies formula-rich HTML without a
 plain LaTeX fallback; the text button supplies the source for math renderers.
+PPT copy also retains the edited source in a Texo-private pasteboard type.
+Pasting it into Texo restores that source rather than importing MathML as HTML.
 
 **Result editing**: Standard text selection, copy, cut, paste, undo and redo
 within the focused result editor, including undo of manual edits and format

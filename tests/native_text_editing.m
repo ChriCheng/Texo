@@ -112,6 +112,38 @@ int main(void) {
         check([popoverController.inputButtons[1].title isEqualToString:@"截图 ⌃⌥K"] &&
               [popoverController.inputButtons[1].accessibilityLabel isEqualToString:@"截图 ⌃⌥K"], "capture button and accessibility reflect the configured shortcut");
 
+        NSPasteboard *board = [NSPasteboard pasteboardWithUniqueName];
+        [board clearContents];
+        NSString *sourceType = @"com.chricheng.texo.source";
+        NSString *source = @"参数 $w_0 = \\frac{m}{n}$\n第二行 $m=2$ 😀";
+        NSString *html = @"<p>参数 <math xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><msub><mi>w</mi><mn>0</mn></msub><annotation encoding=\"application/x-tex\">w_0</annotation></semantics></math></p>";
+        NSPasteboardItem *officeItem = [[NSPasteboardItem alloc] init];
+        [officeItem setString:html forType:NSPasteboardTypeHTML];
+        [officeItem setString:source forType:sourceType];
+        check([board writeObjects:@[officeItem]], "Office paste fixture uses only a private pasteboard");
+        NSPasteboardType preferred = [view preferredPasteboardTypeFromArray:board.types restrictedToTypesFromArray:nil];
+        check([preferred isEqualToString:sourceType], "Texo prefers its editor source over flattened MathML HTML");
+        TexoPopoverSetResult("before paste");
+        TexoPopoverResetUndo();
+        [view setSelectedRange:NSMakeRange(0, view.string.length)];
+        BOOL pasted = [view readSelectionFromPasteboard:board type:preferred];
+        check(pasted && [view.string isEqualToString:source], "Office round trip restores exact Markdown, formulas and Unicode");
+        finishUndoGroup(view);
+        check(view.undoManager.canUndo, "Office source paste participates in editor undo");
+        if (view.undoManager.canUndo) [view.undoManager undo];
+        check([view.string isEqualToString:@"before paste"], "undo restores the selection replaced by Office source paste");
+        TexoPopoverSetBusy(true);
+        check(![view readSelectionFromPasteboard:board type:sourceType] && [view.string isEqualToString:@"before paste"],
+              "busy editor rejects Office source paste");
+        TexoPopoverSetBusy(false);
+        [board clearContents];
+        [board setString:@"普通文本 $y$" forType:NSPasteboardTypeString];
+        preferred = [view preferredPasteboardTypeFromArray:board.types restrictedToTypesFromArray:nil];
+        [view setSelectedRange:NSMakeRange(0, view.string.length)];
+        check([view readSelectionFromPasteboard:board type:preferred] && [view.string isEqualToString:@"普通文本 $y$"],
+              "ordinary paste keeps the native text import path");
+        [board releaseGlobally];
+
         ClipboardSpyView *spy = [[ClipboardSpyView alloc] initWithFrame:NSMakeRect(0, 0, 100, 50)];
         [window.contentView addSubview:spy];
         [window makeFirstResponder:spy];

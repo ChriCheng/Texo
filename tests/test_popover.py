@@ -74,6 +74,13 @@ class NativePopoverTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "新版 Texo.app"):
                 NativePopover(lambda event: None)
 
+    def test_previous_office_abi_requires_the_updated_launcher(self):
+        self.library.TexoCopyOffice.return_value = True
+        del self.library.TexoCopyOfficeWithSource
+        self.assertFalse(NativePopover.available())
+        with self.assertRaisesRegex(RuntimeError, "新版 Texo.app"):
+            NativePopover(lambda event: None)
+
     def test_worker_thread_cannot_write_native_view(self):
         popover = NativePopover(lambda event: None)
         failures = []
@@ -119,9 +126,10 @@ class NativePopoverTests(unittest.TestCase):
 
     def test_office_payload_crosses_native_boundary_before_copy(self):
         popover = NativePopover(lambda event: None)
-        self.library.TexoCopyOffice.return_value = True
+        self.library.TexoCopyOfficeWithSource.return_value = True
         self.assertTrue(popover.copy_office(dict(plain="中文 $x$", html="<p>中文</p>")))
-        self.library.TexoCopyOffice.assert_called_once_with("<p>中文</p>".encode())
+        self.library.TexoCopyOfficeWithSource.assert_called_once_with("中文 $x$".encode(), "<p>中文</p>".encode())
+        self.assertEqual(self.library.TexoCopyOfficeWithSource.argtypes, [ctypes.c_char_p, ctypes.c_char_p])
         popover.close()
         self.assertFalse(popover.copy_office({}))
 

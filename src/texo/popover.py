@@ -24,7 +24,7 @@ _API = (
     ("TexoPopoverSetFormat", [ctypes.c_int], None),
     ("TexoPopoverResetUndo", [], None),
     ("TexoPopoverSetCaptureShortcut", [ctypes.c_char_p], None),
-    ("TexoCopyOffice", [ctypes.c_char_p], ctypes.c_bool),
+    ("TexoCopyOfficeWithSource", [ctypes.c_char_p, ctypes.c_char_p], ctypes.c_bool),
 )
 
 
@@ -102,7 +102,7 @@ class NativePopover:
         _require_main_thread()
         if not self.installed:
             return False
-        return bool(self.library.TexoCopyOffice(payload["html"].encode("utf-8")))
+        return bool(self.library.TexoCopyOfficeWithSource(payload["plain"].encode("utf-8"), payload["html"].encode("utf-8")))
 
     def get_result(self):
         _require_main_thread()

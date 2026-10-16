@@ -27,6 +27,19 @@ typedef void (*TexoPopoverCallback)(int);
 @end
 
 @implementation TexoResultView
+- (NSArray<NSPasteboardType> *)readablePasteboardTypes {
+    return [@[@"com.chricheng.texo.source"] arrayByAddingObjectsFromArray:[super readablePasteboardTypes]];
+}
+- (BOOL)readSelectionFromPasteboard:(NSPasteboard *)pasteboard type:(NSPasteboardType)type {
+    if ([type isEqualToString:@"com.chricheng.texo.source"]) {
+        if (!self.editable) return NO;
+        NSString *source = [pasteboard stringForType:type];
+        if (!source) return NO;
+        [self insertText:source replacementRange:self.selectedRange];
+        return YES;
+    }
+    return [super readSelectionFromPasteboard:pasteboard type:type];
+}
 - (BOOL)performKeyEquivalent:(NSEvent *)event {
     if (self.window.firstResponder == self) {
         NSEventModifierFlags modifiers = event.modifierFlags & (NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagControl | NSEventModifierFlagOption);

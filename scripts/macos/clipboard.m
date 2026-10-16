@@ -1,13 +1,14 @@
 #import <AppKit/AppKit.h>
 #include <stdbool.h>
 
-static bool copyOfficeToPasteboard(NSPasteboard *pasteboard, NSString *html) {
-    if (!html.length) {
+static bool copyOfficeToPasteboard(NSPasteboard *pasteboard, NSString *source, NSString *html) {
+    if (!source.length || !html.length) {
         return false;
     }
     NSPasteboardItem *item = [[NSPasteboardItem alloc] init];
-    // A plain LaTeX fallback lets PowerPoint bypass the MathML importer.
-    if (![item setString:html forType:NSPasteboardTypeHTML]) {
+    // Keep source private so PowerPoint cannot bypass MathML for raw LaTeX.
+    if (![item setString:html forType:NSPasteboardTypeHTML] ||
+        ![item setString:source forType:@"com.chricheng.texo.source"]) {
         return false;
     }
     NSMutableArray<NSPasteboardItem *> *previous = [NSMutableArray array];
@@ -34,9 +35,10 @@ static bool copyOfficeToPasteboard(NSPasteboard *pasteboard, NSString *html) {
 }
 
 __attribute__((visibility("default")))
-bool TexoCopyOffice(const char *html) {
-    if (!NSThread.isMainThread || !html) {
+bool TexoCopyOfficeWithSource(const char *source, const char *html) {
+    if (!NSThread.isMainThread || !source || !html) {
         return false;
     }
-    return copyOfficeToPasteboard(NSPasteboard.generalPasteboard, [NSString stringWithUTF8String:html]);
+    return copyOfficeToPasteboard(NSPasteboard.generalPasteboard,
+        [NSString stringWithUTF8String:source], [NSString stringWithUTF8String:html]);
 }

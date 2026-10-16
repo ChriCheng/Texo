@@ -1,9 +1,8 @@
 from pathlib import Path
+import shutil
 
-from huggingface_hub import HfApi, create_repo, snapshot_download
-from transformers import AutoTokenizer, VisionEncoderDecoderModel
-
-from task import FormulaNetLit, PreTrainedTokenizerFast
+from huggingface_hub import HfApi, create_repo, hf_hub_download, snapshot_download
+from transformers import AutoTokenizer, PreTrainedTokenizerFast, VisionEncoderDecoderModel
 
 
 def load(path='model'):
@@ -12,6 +11,8 @@ def load(path='model'):
     return model, tokenizer
 
 def save(save_path='model'):
+    from task import FormulaNetLit
+
     ckpt_path = Path('outputs/bs=64-lr=1e-05-freeze=False/2025-10-04_22-15-03/0/checkpoints/step=85765-val_loss=2.9496e-01-BLEU=0.8356-edit_distance=0.1291.ckpt')
     task = FormulaNetLit.load_from_checkpoint(ckpt_path, 
                                             hparams_file=ckpt_path.parent.parent.joinpath("tb_logs/hparams.yaml"))
@@ -43,8 +44,11 @@ def pull(args):
         model_path = snapshot_download(
             repo_id=repo_id,
             local_dir="./model",
-            ignore_patterns=["checkpoints/**"]
+            ignore_patterns=["checkpoints/**", "onnx/**"]
         )
+    if args.mixed:
+        detector = hf_hub_download(repo_id="breezedeus/pix2text-mfd-1.5", filename="pix2text-mfd-1.5.onnx")
+        shutil.copyfile(detector, Path("model/mfd.onnx"))
 
 if __name__ == '__main__':
     import argparse
@@ -55,6 +59,7 @@ if __name__ == '__main__':
 
     sub_parser = sub_parsers.add_parser("pull", help="pull model from HF hub")
     sub_parser.add_argument("--with_useful_ckpts", action="store_true", help="pull with useful checkpoints")
+    sub_parser.add_argument("--mixed", action="store_true", help="also download the mixed text/formula detector")
     sub_parser.set_defaults(func=pull)
 
     args = parser.parse_args()

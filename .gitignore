@@ -138,6 +138,7 @@ celerybeat.pid
 .env
 .envrc
 .venv
+.local/
 env/
 venv/
 ENV/
@@ -206,6 +207,7 @@ node_modules/
 *.onnx
 *.ipynb
 *.txt
+!requirements-macos.txt
 outputs
 !.gitkeep
 !convert.log

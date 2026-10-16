@@ -9,6 +9,14 @@ and formula screenshots into Markdown on macOS.
 
 **Copy format**: The recognition result copied as plain LaTeX, inline math enclosed in single dollar signs, or display math enclosed in double dollar signs. The native app defaults to display math and remembers the selection. No format includes a trailing newline.
 
+**PPT copy**: An explicit copy action that preserves prose and converts formula
+source in the edited result into rich content for PowerPoint's editable
+equations. Ordinary and automatic copy keep the text format.
+
+**Result editing**: Standard text selection, copy, cut, paste, undo and redo
+within the focused result editor, including undo of manual edits and format
+changes. A newly recognized image starts a new editing history.
+
 **Mixed result**: Chinese/English prose in reading order, with detected inline
 formulas enclosed in single dollar signs and display formulas in double dollar
 signs. Copy preserves the complete Markdown without wrapping the prose in math.
@@ -25,6 +33,11 @@ the remaining text with macOS Vision. Images remain local.
 
 **Global shortcut**: A key combination that triggers Texo while another application is in front, for as long as Texo is running.
 
+**Shortcut settings**: Separate saved combinations for screenshot recognition
+and showing or hiding the result, defaulting to Command-L and
+Command-Shift-semicolon. Recording creates a draft; Apply saves available
+combinations, while Cancel preserves the previous ones.
+
 **Resident popover**: The native white menu-bar interface with image preview on
 the left and editable result on the right. Either mouse button opens the icon's
 menu; its show/hide item or global Command-Shift-semicolon toggles the popover.
@@ -33,8 +46,8 @@ region selection. File, clipboard and screenshot recognition keep the popover
 hidden during OCR by default; users can still request progress. Success shows
 and automatically copies the completed result. Single-formula results display
 the selected copy delimiters; changing the format rewraps the current edits.
-Failure or cancellation preserves the clipboard. Shortcut rebinding is not yet
-available.
+Failure or cancellation preserves the clipboard. The shortcut settings can
+replace both default combinations.
 
 **Recognition activity**: A pie-style menu-bar indicator replaces the normal
 four-corner formula icon only after image acquisition, while recognition runs.

@@ -110,6 +110,21 @@ class NativePopoverTests(unittest.TestCase):
         self.library.TexoPopoverSetFormat.assert_not_called()
         popover.close()
 
+    def test_new_result_clears_undo_but_format_edits_do_not(self):
+        popover = NativePopover(lambda event: None)
+        popover.set_result("x", reset_undo=True)
+        popover.set_result("$$x$$")
+        self.library.TexoPopoverResetUndo.assert_called_once_with()
+        popover.close()
+
+    def test_office_payload_crosses_native_boundary_before_copy(self):
+        popover = NativePopover(lambda event: None)
+        self.library.TexoCopyOffice.return_value = True
+        self.assertTrue(popover.copy_office(dict(plain="中文 $x$", html="<p>中文</p>", mathml="<math/>")))
+        self.library.TexoCopyOffice.assert_called_once_with("中文 $x$".encode(), "<p>中文</p>".encode())
+        popover.close()
+        self.assertFalse(popover.copy_office({}))
+
 
 if __name__ == "__main__":
     unittest.main()

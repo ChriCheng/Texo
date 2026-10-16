@@ -29,6 +29,7 @@ class NativeOCRWindow:
         self.recognize, self.open_image = recognize, open_image
         self.events = Queue()
         self.busy = self.interaction_active = self.login_busy = False
+        self.shortcuts_active = False
         self.hotkeys = []
         self.statusbar = StatusBar(self.events.put)
         try:
@@ -47,15 +48,18 @@ class NativeOCRWindow:
             self.statusbar.set_login_enabled(login_enabled())
         except RuntimeError as error:
             self.panel.set_status(str(error))
-        for options, action in (({}, 2), ({"key_code": 41, "modifiers": (1 << 8) | (1 << 9), "identifier": 2, "label": "⌘⇧;"}, 1)):
-            try:
-                self.hotkeys.append(GlobalHotkey(lambda action=action: self.events.put(action), **options))
-            except RuntimeError as error:
-                self.panel.set_status(str(error))
+        shortcuts = self.statusbar.get_shortcuts()
+        self.panel.set_capture_shortcut(shortcuts[0]["label"])
+        try:
+            self.register_hotkeys(shortcuts)
+        except RuntimeError as error:
+            self.panel.set_status(str(error))
         root.after(30, self.poll)
 
     def show(self):
-        if not self.interaction_active:
+        if self.shortcuts_active:
+            self.statusbar.show_shortcut_settings()
+        elif not self.interaction_active:
             self.panel.show()
 
     def toggle(self):
@@ -68,9 +72,65 @@ class NativeOCRWindow:
         if event.widget is self.root:
             self.panel.close()
             self.statusbar.close()
-            for hotkey in self.hotkeys:
+            self.release_hotkeys()
+
+    def release_hotkeys(self):
+        for hotkey in self.hotkeys:
+            hotkey.close()
+        self.hotkeys.clear()
+
+    def register_hotkeys(self, shortcuts):
+        registered = []
+        try:
+            for identifier, (shortcut, action) in enumerate(zip(shortcuts, (2, 1)), 1):
+                registered.append(GlobalHotkey(lambda action=action: self.events.put(action), identifier=identifier, **shortcut))
+        except RuntimeError:
+            for hotkey in registered:
                 hotkey.close()
-            self.hotkeys.clear()
+            raise
+        self.hotkeys = registered
+
+    def open_shortcut_settings(self):
+        if self.shortcuts_active:
+            self.statusbar.show_shortcut_settings()
+            return
+        if self.busy:
+            return
+        self.panel.hide(immediately=True)
+        self.release_hotkeys()
+        self.shortcuts_active = True
+        if not self.statusbar.show_shortcut_settings():
+            self.cancel_shortcut_settings()
+            self.panel.set_status("无法打开快捷键设置。")
+            self.show()
+
+    def cancel_shortcut_settings(self):
+        if not self.shortcuts_active:
+            return
+        self.shortcuts_active = False
+        self.statusbar.close_shortcut_settings()
+        try:
+            self.register_hotkeys(self.statusbar.get_shortcuts())
+        except RuntimeError as error:
+            self.panel.set_status(str(error))
+            self.show()
+
+    def save_shortcut_settings(self):
+        if not self.shortcuts_active:
+            return
+        shortcuts = self.statusbar.get_shortcuts(draft=True)
+        try:
+            self.register_hotkeys(shortcuts)
+            if not self.statusbar.commit_shortcuts():
+                raise RuntimeError("快捷键无效，请重新设置。")
+        except RuntimeError as error:
+            self.release_hotkeys()
+            self.statusbar.set_shortcut_error(str(error))
+            return
+        self.shortcuts_active = False
+        self.statusbar.close_shortcut_settings()
+        self.panel.set_capture_shortcut(shortcuts[0]["label"])
+        self.panel.set_status("快捷键已保存并立即生效。")
 
     def set_busy(self, busy):
         self.busy = busy
@@ -79,7 +139,7 @@ class NativeOCRWindow:
             self.statusbar.set_progress(-1)
 
     def poll(self):
-        actions = {1: self.toggle, 2: self.screenshot, 3: self.clipboard, 4: self.toggle_login, 5: self.root.destroy, 6: self.choose, 7: self.copy}
+        actions = {1: self.toggle, 2: self.screenshot, 3: self.clipboard, 4: self.toggle_login, 5: self.root.destroy, 6: self.choose, 7: self.copy, 9: self.copy_ppt, 30: self.open_shortcut_settings, 31: self.save_shortcut_settings, 32: self.cancel_shortcut_settings}
         while True:
             try:
                 event = self.events.get_nowait()
@@ -118,7 +178,7 @@ class NativeOCRWindow:
                     if formula is not None:
                         value, self.result_mode = formula, 1
                 self.panel.set_result_mode(self.result_mode)
-                self.panel.set_result(value or "")
+                self.panel.set_result(value or "", reset_undo=True)
                 self.panel.set_status(f"识别失败：{error}" if error else f"识别完成 · {detail:.2f} 秒，请核对后使用。")
                 self.set_busy(False)
                 if not error and self.copy(automatic=True):
@@ -128,6 +188,15 @@ class NativeOCRWindow:
                 if value is not None:
                     self.statusbar.set_progress(value, detail)
                 self.panel.set_status(detail)
+            elif kind == "office":
+                self.set_busy(False)
+                if not error:
+                    try:
+                        if not self.panel.copy_office(value):
+                            raise RuntimeError("无法写入剪贴板，请重试。")
+                    except Exception as failure:
+                        error = str(failure)
+                self.panel.set_status(f"PPT 复制失败：{error}" if error else "PPT 内容已复制，可直接粘贴到 PowerPoint。")
             elif kind == "login":
                 self.login_busy = False
                 if error:
@@ -145,7 +214,7 @@ class NativeOCRWindow:
         self.acquire(read_clipboard_image, "剪贴板图片")
 
     def acquire(self, get_image, label, capture=False):
-        if self.busy:
+        if self.busy or self.shortcuts_active:
             return
         was_shown = self.panel.is_shown()
         self.panel.hide(immediately=True)
@@ -163,7 +232,7 @@ class NativeOCRWindow:
         self.root.after(200 if capture else 0, lambda: Thread(target=worker, daemon=True).start())
 
     def choose(self):
-        if self.busy:
+        if self.busy or self.shortcuts_active:
             return
         from tkinter import filedialog
 
@@ -201,7 +270,7 @@ class NativeOCRWindow:
         self.result_mode = self.panel.get_mode()
         self.panel.set_result_mode(self.result_mode)
         self.panel.set_image(png.getvalue())
-        self.panel.set_result("")
+        self.panel.set_result("", reset_undo=True)
         self.panel.set_status(f"正在识别 {label}…")
         self.set_busy(True)
         self.statusbar.set_progress(0, f"正在识别 {label}…")
@@ -232,6 +301,8 @@ class NativeOCRWindow:
 
     def copy(self, automatic=False):
         text = self.format_result()
+        if automatic:
+            self.panel.reset_undo()
         if text:
             try:
                 self.root.clipboard_clear()
@@ -243,6 +314,26 @@ class NativeOCRWindow:
                 self.panel.set_status("结果已复制。")
             return True
         return False
+
+    def copy_ppt(self):
+        if self.busy or self.shortcuts_active:
+            return
+        text = self.format_result()
+        if not text:
+            return
+        pure_latex = self.result_mode == 1
+        self.set_busy(True)
+        self.panel.set_status("正在准备 PPT 复制…")
+
+        def worker():
+            try:
+                from texo.office import make_office_payload
+
+                self.events.put(("office", make_office_payload(text, pure_latex=pure_latex), None, None))
+            except Exception as error:
+                self.events.put(("office", None, None, str(error)))
+
+        Thread(target=worker, daemon=True).start()
 
     def toggle_login(self):
         if self.login_busy:

@@ -28,7 +28,8 @@ def build(output):
     if not (ROOT / "model/model.safetensors").is_file():
         raise RuntimeError("公式模型未下载，请先运行 .venv/bin/python scripts/python/hf_hub.py pull --mixed")
     source, statusbar, popover, icon = ROOT / "scripts/macos/launcher.m", ROOT / "scripts/macos/statusbar.m", ROOT / "scripts/macos/popover.m", ROOT / "assets/Texo.icns"
-    for path in (source, statusbar, popover, icon, ROOT / "assets/svg/status-icon.svg"):
+    shortcuts, clipboard = ROOT / "scripts/macos/shortcuts.m", ROOT / "scripts/macos/clipboard.m"
+    for path in (source, statusbar, popover, shortcuts, clipboard, icon, ROOT / "assets/svg/status-icon.svg"):
         if not path.is_file():
             raise RuntimeError(f"应用封装文件缺失：{path}。请更新项目后重试。")
 
@@ -60,8 +61,8 @@ def build(output):
             "CFBundleExecutable": "Texo",
             "CFBundlePackageType": "APPL",
             "CFBundleIconFile": "Texo.icns",
-            "CFBundleShortVersionString": "1.0",
-            "CFBundleVersion": "1",
+            "CFBundleShortVersionString": "1.1",
+            "CFBundleVersion": "2",
             "LSMinimumSystemVersion": "13.0",
             "LSMultipleInstancesProhibited": True,
             "LSUIElement": True,
@@ -72,7 +73,7 @@ def build(output):
         with (staged / "Contents/Info.plist").open("wb") as handle:
             plistlib.dump(info, handle)
         commands = (
-            ["/usr/bin/xcrun", "clang", str(source), str(statusbar), str(popover), "-O2", "-fobjc-arc", "-mmacosx-version-min=13.0", f"-I{include}", f"-L{library}", f"-lpython{python_version}", f"-Wl,-rpath,{library}", "-Wl,-export_dynamic", "-framework", "Foundation", "-framework", "AppKit", "-o", str(executable)],
+            ["/usr/bin/xcrun", "clang", str(source), str(statusbar), str(popover), str(shortcuts), str(clipboard), "-O2", "-fobjc-arc", "-mmacosx-version-min=13.0", f"-I{include}", f"-L{library}", f"-lpython{python_version}", f"-Wl,-rpath,{library}", "-Wl,-export_dynamic", "-framework", "Foundation", "-framework", "AppKit", "-o", str(executable)],
             ["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", BUNDLE_ID, str(staged)],
         )
         for command in commands:

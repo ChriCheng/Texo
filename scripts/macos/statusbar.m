@@ -3,6 +3,9 @@
 #include <stdbool.h>
 
 typedef void (*TexoStatusCallback)(int);
+extern unsigned int TexoGetShortcutModifiers(int action);
+extern const char *TexoGetShortcutLabel(int action);
+extern NSString *TexoShortcutCharacter(int action);
 
 @interface TexoStatusController : NSObject
 @property(nonatomic, strong) NSStatusItem *item;
@@ -68,7 +71,28 @@ typedef void (*TexoStatusCallback)(int);
 @end
 
 static TexoStatusController *controller;
-static NSString * const defaultTooltip = @"Texo · 点击显示菜单；⌘L 截图；⌘⇧; 显示／收起结果";
+static NSString *shortcutTooltip(void) {
+    return [NSString stringWithFormat:@"Texo · 点击显示菜单；%@ 截图；%@ 显示／收起结果",
+        [NSString stringWithUTF8String:TexoGetShortcutLabel(0)], [NSString stringWithUTF8String:TexoGetShortcutLabel(1)]];
+}
+
+void TexoRefreshShortcutPresentation(void) {
+    if (!NSThread.isMainThread || !controller) {
+        return;
+    }
+    for (int action = 0; action < 2; action++) {
+        NSMenuItem *item = [controller.menu itemWithTag:action == 0 ? 2 : 1];
+        unsigned int modifiers = TexoGetShortcutModifiers(action);
+        item.keyEquivalent = TexoShortcutCharacter(action);
+        item.keyEquivalentModifierMask = ((modifiers & 256) ? NSEventModifierFlagCommand : 0)
+            | ((modifiers & 512) ? NSEventModifierFlagShift : 0)
+            | ((modifiers & 2048) ? NSEventModifierFlagOption : 0)
+            | ((modifiers & 4096) ? NSEventModifierFlagControl : 0);
+    }
+    if (controller.progress < 0) {
+        controller.item.button.toolTip = shortcutTooltip();
+    }
+}
 
 __attribute__((visibility("default")))
 void *TexoStatusItemButton(void) {
@@ -136,7 +160,7 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
     image.size = NSMakeSize(18, 18);
     controller.normalImage = image;
     controller.item.button.image = image;
-    controller.item.button.toolTip = defaultTooltip;
+    controller.item.button.toolTip = shortcutTooltip();
     controller.item.button.accessibilityLabel = @"Texo";
 
     controller.menu = [[NSMenu alloc] initWithTitle:@"Texo"];
@@ -146,6 +170,7 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
     [controller.menu addItem:NSMenuItem.separatorItem];
     [controller addItem:@"显示／收起结果" tag:1 to:controller.menu key:@";" modifiers:NSEventModifierFlagCommand | NSEventModifierFlagShift];
     [controller addItem:@"复制结果" tag:7 to:controller.menu key:@"" modifiers:0];
+    [controller addItem:@"PPT 专用复制" tag:9 to:controller.menu key:@"" modifiers:0];
     [controller.menu addItem:NSMenuItem.separatorItem];
     NSMenu *settings = [[NSMenu alloc] initWithTitle:@"设定"];
     NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"设定" action:nil keyEquivalent:@""];
@@ -169,11 +194,13 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
         [controller addItem:@"$$公式$$" tag:12 to:formats key:@"" modifiers:0]
     ];
     [settings addItem:NSMenuItem.separatorItem];
+    [controller addItem:@"快捷键设置…" tag:30 to:settings key:@"" modifiers:0];
     controller.loginItem = [controller addItem:@"登录时自动启动" tag:4 to:settings key:@"" modifiers:0];
     [controller.menu addItem:NSMenuItem.separatorItem];
     [controller addItem:@"退出 Texo" tag:5 to:controller.menu key:@"q" modifiers:NSEventModifierFlagCommand];
     TexoSetCopyFormat(TexoGetCopyFormat());
     TexoSetRecognitionMode(TexoGetRecognitionMode());
+    TexoRefreshShortcutPresentation();
     controller.item.menu = controller.menu;
     return true;
 }
@@ -201,7 +228,7 @@ void TexoSetRecognitionProgress(double value, const char *label) {
         controller.progress = -1;
         controller.targetProgress = -1;
         controller.item.button.image = controller.normalImage;
-        controller.item.button.toolTip = defaultTooltip;
+        controller.item.button.toolTip = shortcutTooltip();
         return;
     }
     if (value == 0 || controller.progress < 0) {

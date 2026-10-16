@@ -15,6 +15,17 @@ _API = (
     ("TexoGetRecognitionMode", [], ctypes.c_int),
     ("TexoSetRecognitionMode", [ctypes.c_int], None),
     ("TexoSetRecognitionProgress", [ctypes.c_double, ctypes.c_char_p], None),
+    ("TexoShowShortcutSettings", [_Callback], ctypes.c_bool),
+    ("TexoShortcutSettingsShown", [], ctypes.c_bool),
+    ("TexoShortcutSettingsClose", [], None),
+    ("TexoShortcutSettingsSetError", [ctypes.c_char_p], None),
+    ("TexoGetShortcutKey", [ctypes.c_int], ctypes.c_int),
+    ("TexoGetShortcutModifiers", [ctypes.c_int], ctypes.c_uint),
+    ("TexoGetShortcutLabel", [ctypes.c_int], ctypes.c_char_p),
+    ("TexoGetDraftShortcutKey", [ctypes.c_int], ctypes.c_int),
+    ("TexoGetDraftShortcutModifiers", [ctypes.c_int], ctypes.c_uint),
+    ("TexoGetDraftShortcutLabel", [ctypes.c_int], ctypes.c_char_p),
+    ("TexoCommitShortcuts", [], ctypes.c_bool),
 )
 
 
@@ -79,8 +90,35 @@ class StatusBar:
         if self.installed:
             self.library.TexoSetRecognitionProgress(value, label.encode("utf-8"))
 
+    def get_shortcuts(self, draft=False):
+        _require_main_thread()
+        prefix = "TexoGetDraftShortcut" if draft else "TexoGetShortcut"
+        return [dict(key_code=getattr(self.library, prefix + "Key")(action),
+                     modifiers=getattr(self.library, prefix + "Modifiers")(action),
+                     label=(getattr(self.library, prefix + "Label")(action) or b"").decode("utf-8"))
+                for action in range(2)]
+
+    def show_shortcut_settings(self):
+        _require_main_thread()
+        return self.installed and bool(self.library.TexoShowShortcutSettings(self.callback))
+
+    def close_shortcut_settings(self):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoShortcutSettingsClose()
+
+    def set_shortcut_error(self, message):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoShortcutSettingsSetError(message.encode("utf-8"))
+
+    def commit_shortcuts(self):
+        _require_main_thread()
+        return self.installed and bool(self.library.TexoCommitShortcuts())
+
     def close(self):
         _require_main_thread()
         if self.installed:
+            self.library.TexoShortcutSettingsClose()
             self.library.TexoRemoveStatusItem()
             self.installed = False

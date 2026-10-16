@@ -27,12 +27,32 @@ typedef void (*TexoPopoverCallback)(int);
 @end
 
 @implementation TexoResultView
+- (BOOL)performKeyEquivalent:(NSEvent *)event {
+    if (self.window.firstResponder == self) {
+        NSEventModifierFlags modifiers = event.modifierFlags & (NSEventModifierFlagCommand | NSEventModifierFlagShift | NSEventModifierFlagControl | NSEventModifierFlagOption);
+        NSString *key = event.charactersIgnoringModifiers.lowercaseString;
+        if (modifiers == NSEventModifierFlagCommand) {
+            if ([key isEqualToString:@"a"]) { [self selectAll:nil]; return YES; }
+            if ([key isEqualToString:@"c"]) { [self copy:nil]; return YES; }
+            if ([key isEqualToString:@"x"]) { if (self.editable) [self cut:nil]; return YES; }
+            if ([key isEqualToString:@"v"]) { if (self.editable) [self paste:nil]; return YES; }
+            if ([key isEqualToString:@"z"]) {
+                if (self.editable && self.undoManager.canUndo) [self.undoManager undo];
+                return YES;
+            }
+        } else if (modifiers == (NSEventModifierFlagCommand | NSEventModifierFlagShift) && [key isEqualToString:@"z"]) {
+            if (self.editable && self.undoManager.canRedo) [self.undoManager redo];
+            return YES;
+        }
+    }
+    return [super performKeyEquivalent:event];
+}
 - (void)cancelOperation:(id)sender {
     [self.popover performClose:sender];
 }
 @end
 
-@interface TexoPopoverController : NSViewController <NSTextViewDelegate>
+@interface TexoPopoverController : NSViewController <NSTextViewDelegate, NSPopoverDelegate>
 @property(nonatomic, strong) NSPopover *popover;
 @property(nonatomic, strong) NSImageView *preview;
 @property(nonatomic, strong) NSTextField *previewHint;
@@ -41,12 +61,14 @@ typedef void (*TexoPopoverCallback)(int);
 @property(nonatomic, strong) NSPopUpButton *mode;
 @property(nonatomic, strong) NSPopUpButton *format;
 @property(nonatomic, strong) NSButton *resultCopyButton;
+@property(nonatomic, strong) NSButton *pptCopyButton;
 @property(nonatomic, strong) NSArray<NSButton *> *inputButtons;
 @property(nonatomic, copy) NSString *resultSnapshot;
 @property(nonatomic, assign) TexoPopoverCallback callback;
 @property(nonatomic, assign) BOOL busy;
 @property(nonatomic, assign) int resultMode;
 - (void)refreshControls;
+- (void)focusResult;
 @end
 
 @implementation TexoPopoverController
@@ -91,6 +113,7 @@ typedef void (*TexoPopoverCallback)(int);
     self.result.insertionPointColor = NSColor.textColor;
     self.result.drawsBackground = NO;
     self.result.richText = NO;
+    self.result.allowsUndo = YES;
     self.result.automaticQuoteSubstitutionEnabled = NO;
     self.result.automaticDashSubstitutionEnabled = NO;
     self.result.automaticTextReplacementEnabled = NO;
@@ -110,6 +133,7 @@ typedef void (*TexoPopoverCallback)(int);
     NSButton *clipboard = [self button:@"识别剪贴板" frame:NSMakeRect(244, 52, 120, 32) event:3];
     self.inputButtons = @[choose, capture, clipboard];
     self.resultCopyButton = [self button:@"复制结果" frame:NSMakeRect(628, 52, 116, 32) event:7];
+    self.pptCopyButton = [self button:@"PPT专用复制" frame:NSMakeRect(500, 52, 124, 32) event:9];
 
     self.mode = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 10, 150, 30) pullsDown:NO];
     [self.mode addItemsWithTitles:@[@"中文与公式", @"公式"]];
@@ -154,6 +178,17 @@ typedef void (*TexoPopoverCallback)(int);
 - (void)textDidChange:(NSNotification *)notification {
     [self refreshControls];
 }
+- (void)focusResult {
+    if (self.popover.shown) {
+        NSWindow *window = self.view.window;
+        [window makeKeyAndOrderFront:nil];
+        [window makeFirstResponder:self.result];
+    }
+}
+- (void)popoverDidShow:(NSNotification *)notification {
+    // The popover creates and animates its own window; focus it once ready.
+    [self focusResult];
+}
 - (void)refreshControls {
     for (NSButton *button in self.inputButtons) {
         button.enabled = !self.busy;
@@ -162,6 +197,7 @@ typedef void (*TexoPopoverCallback)(int);
     self.format.enabled = !self.busy && self.resultMode == 1;
     self.result.editable = !self.busy;
     self.resultCopyButton.enabled = !self.busy && [self.result.string stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].length > 0;
+    self.pptCopyButton.enabled = self.resultCopyButton.enabled;
 }
 @end
 
@@ -180,6 +216,7 @@ bool TexoInstallPopover(TexoPopoverCallback callback) {
     popover.appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
     popover.contentSize = NSMakeSize(760, 430);
     popover.contentViewController = popoverController;
+    popover.delegate = popoverController;
     popoverController.popover = popover;
     ((TexoPopoverView *)popoverController.view).popover = popover;
     popoverController.result.popover = popover;
@@ -193,9 +230,9 @@ void TexoShowPopover(void) {
     }
     NSView *button = (__bridge NSView *)TexoStatusItemButton();
     if (button) {
-        [popoverController.popover showRelativeToRect:button.bounds ofView:button preferredEdge:NSRectEdgeMinY];
         [NSApp activateIgnoringOtherApps:YES];
-        [popoverController.view.window makeFirstResponder:popoverController.result];
+        [popoverController.popover showRelativeToRect:button.bounds ofView:button preferredEdge:NSRectEdgeMinY];
+        [popoverController focusResult];
     }
 }
 
@@ -227,8 +264,38 @@ void TexoPopoverSetImage(const void *png, size_t length) {
 __attribute__((visibility("default")))
 void TexoPopoverSetResult(const char *utf8) {
     if (NSThread.isMainThread && popoverController) {
-        popoverController.result.string = utf8 ? ([NSString stringWithUTF8String:utf8] ?: @"") : @"";
+        NSTextView *result = popoverController.result;
+        NSString *text = utf8 ? ([NSString stringWithUTF8String:utf8] ?: @"") : @"";
+        NSRange range = NSMakeRange(0, result.string.length);
+        // OCR updates arrive while user editing is disabled.
+        BOOL editable = result.editable;
+        result.editable = YES;
+        if (![result.string isEqualToString:text] && [result shouldChangeTextInRange:range replacementString:text]) {
+            NSAttributedString *replacement = [[NSAttributedString alloc] initWithString:text attributes:result.typingAttributes];
+            [result.textStorage replaceCharactersInRange:range withAttributedString:replacement];
+            [result didChangeText];
+        }
+        result.editable = editable;
         [popoverController refreshControls];
+    }
+}
+
+__attribute__((visibility("default")))
+void TexoPopoverResetUndo(void) {
+    if (NSThread.isMainThread && popoverController) {
+        [popoverController.result breakUndoCoalescing];
+        [popoverController.result.undoManager removeAllActions];
+    }
+}
+
+__attribute__((visibility("default")))
+void TexoPopoverSetCaptureShortcut(const char *label) {
+    if (NSThread.isMainThread && popoverController) {
+        NSString *shortcut = label ? [NSString stringWithUTF8String:label] : nil;
+        NSButton *button = popoverController.inputButtons[1];
+        button.title = [@"截图 " stringByAppendingString:shortcut.length ? shortcut : @"⌘L"];
+        button.accessibilityLabel = button.title;
+        button.toolTip = button.title;
     }
 }
 
@@ -298,6 +365,7 @@ void TexoRemovePopover(void) {
     }
     popoverController.callback = NULL;
     popoverController.result.delegate = nil;
+    popoverController.popover.delegate = nil;
     popoverController.popover.animates = NO;
     [popoverController.popover close];
     popoverController.popover.contentViewController = nil;

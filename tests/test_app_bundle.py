@@ -23,6 +23,8 @@ class AppBundleTests(unittest.TestCase):
             self.root / "scripts/macos/launcher.m",
             self.root / "scripts/macos/statusbar.m",
             self.root / "scripts/macos/popover.m",
+            self.root / "scripts/macos/shortcuts.m",
+            self.root / "scripts/macos/clipboard.m",
             self.root / "assets/Texo.icns",
             self.root / "assets/svg/status-icon.svg",
         ):

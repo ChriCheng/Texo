@@ -79,6 +79,27 @@ class StatusBarTests(unittest.TestCase):
         self.assertIn("主线程", failures[0])
         library.assert_not_called()
 
+    def test_shortcut_preferences_and_settings_use_the_same_callback(self):
+        library = Mock()
+        library.TexoInstallStatusItem.return_value = True
+        library.TexoGetShortcutKey.side_effect = [37, 41]
+        library.TexoGetShortcutModifiers.side_effect = [256, 768]
+        library.TexoGetShortcutLabel.side_effect = ["⌘L".encode(), "⌘⇧;".encode()]
+        library.TexoGetDraftShortcutKey.side_effect = [40, 11]
+        library.TexoGetDraftShortcutModifiers.side_effect = [2304, 2304]
+        library.TexoGetDraftShortcutLabel.side_effect = ["⌥⌘K".encode(), "⌥⌘B".encode()]
+        with patch("texo.statusbar.sys.platform", "darwin"), patch("texo.statusbar.ctypes.CDLL", return_value=library):
+            statusbar = StatusBar(lambda event: None)
+            self.assertEqual(statusbar.get_shortcuts()[0], dict(key_code=37, modifiers=256, label="⌘L"))
+            self.assertEqual(statusbar.get_shortcuts(draft=True)[1], dict(key_code=11, modifiers=2304, label="⌥⌘B"))
+            self.assertTrue(statusbar.show_shortcut_settings())
+            library.TexoShowShortcutSettings.assert_called_once_with(statusbar.callback)
+            statusbar.set_shortcut_error("快捷键已占用")
+            library.TexoShortcutSettingsSetError.assert_called_once_with("快捷键已占用".encode())
+            self.assertTrue(statusbar.commit_shortcuts())
+            statusbar.close()
+            self.assertFalse(statusbar.show_shortcut_settings())
+
 
 if __name__ == "__main__":
     unittest.main()

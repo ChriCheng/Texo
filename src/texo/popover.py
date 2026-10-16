@@ -22,6 +22,9 @@ _API = (
     ("TexoPopoverSetResultMode", [ctypes.c_int], None),
     ("TexoPopoverGetFormat", [], ctypes.c_int),
     ("TexoPopoverSetFormat", [ctypes.c_int], None),
+    ("TexoPopoverResetUndo", [], None),
+    ("TexoPopoverSetCaptureShortcut", [ctypes.c_char_p], None),
+    ("TexoCopyOffice", [ctypes.c_char_p, ctypes.c_char_p], ctypes.c_bool),
 )
 
 
@@ -78,10 +81,29 @@ class NativePopover:
             buffer = ctypes.create_string_buffer(png)
             self.library.TexoPopoverSetImage(buffer, len(png))
 
-    def set_result(self, text):
+    def set_result(self, text, reset_undo=False):
         _require_main_thread()
         if self.installed:
             self.library.TexoPopoverSetResult(text.encode("utf-8"))
+            if reset_undo:
+                self.reset_undo()
+
+    def reset_undo(self):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoPopoverResetUndo()
+
+    def set_capture_shortcut(self, label):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoPopoverSetCaptureShortcut(label.encode("utf-8"))
+
+    def copy_office(self, payload):
+        _require_main_thread()
+        if not self.installed:
+            return False
+        return bool(self.library.TexoCopyOffice(payload["plain"].encode("utf-8"),
+                                              payload["html"].encode("utf-8")))
 
     def get_result(self):
         _require_main_thread()

@@ -111,7 +111,13 @@ a Dock icon. Left-click or right-click its menu-bar icon to open the menu. Choos
 **Esc** in the popover or clicking outside it only hides the popover;
 recognition and the global shortcuts remain available. Open the icon's menu and
 choose **退出 Texo**, or use **Command-Q** while Texo is active, to quit and release
-both shortcuts. Custom shortcut rebinding is not implemented yet.
+both shortcuts. To change them, open **设定 → 快捷键设置**, click a recording
+button and press the new combination, then click **应用**. The two combinations
+must differ and include Command, Control or Option. Common editing shortcuts
+are reserved. Texo pauses its global shortcuts while settings are open;
+**取消** restores the saved combinations. **恢复默认** changes the draft, and
+**应用** makes it effective. Occupied combinations show an error without saving.
+The menu and screenshot button update immediately, and settings survive restart.
 
 The normal menu-bar icon uses the original logo's four scan corners and
 outlined formula, adapting to light or dark menu bars. During recognition it
@@ -192,6 +198,19 @@ leaves the existing clipboard intact.
 Changing the mode affects the next recognition and preserves the current
 result's copy behavior. The terminal-launched window uses its **复制结果** button;
 the CLI also omits the trailing newline.
+
+The native result editor supports **Command-A**, **Command-C/X/V**, **Command-Z**
+and **Command-Shift-Z** while it has keyboard focus. Manual edits and changes
+to copy delimiters can be undone. Each new recognition starts a new undo history.
+
+Use **PPT 专用复制** in the native result panel or menu to paste Chinese prose and math
+into PowerPoint as rich content with editable Office equations. This explicit
+action uses the current edited result; normal and automatic copy still produce
+the selected LaTeX/Markdown text. The converter runs locally using Pandoc
+(`brew install pandoc` if missing); a conversion error leaves the clipboard
+unchanged. Supported formula commands depend on Pandoc and PowerPoint's MathML
+importer. This is not a full LaTeX document compiler, and it does not transfer
+document themes or slide layouts.
 
 `launch_macos.command` still opens the terminal-launched desktop window; closing
 that window quits that instance. Menu-bar residency and login startup belong to

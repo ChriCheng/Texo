@@ -27,13 +27,16 @@ def screen_capture_allowed():
 
 
 def capture_image():
-    if not screen_capture_allowed():
+    allowed = screen_capture_allowed()
+    if not allowed and os.environ.get("TEXO_APP_BUNDLE"):
+        request = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics").CGRequestScreenCaptureAccess
+        request.argtypes = []
+        request.restype = ctypes.c_bool
+        allowed = bool(request())
+    if not allowed:
         if os.environ.get("TEXO_APP_BUNDLE"):
-            request = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics").CGRequestScreenCaptureAccess
-            request.argtypes = []
-            request.restype = ctypes.c_bool
-            request()
-        raise RuntimeError("截图权限未开启。请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许 Texo（若从终端启动则允许 iTerm2 或 Terminal），然后完全退出并重新打开获授权的应用。")
+            raise RuntimeError("Texo 录屏授权未生效，请重新授权并重启。请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许 Texo；若已开启，请关闭后重新开启。")
+        raise RuntimeError("截图权限未开启。请在「系统设置 → 隐私与安全性 → 屏幕录制」中允许 iTerm2 或 Terminal，然后完全退出并重新打开获授权的终端。")
     with tempfile.TemporaryDirectory(prefix="texo-capture-") as directory:
         path = Path(directory) / "formula.png"
         result = subprocess.run(

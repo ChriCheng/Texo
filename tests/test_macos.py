@@ -65,10 +65,22 @@ class CaptureTests(unittest.TestCase):
         from texo.macos import capture_image
 
         with patch.dict(os.environ, {"TEXO_APP_BUNDLE": "/Applications/Texo.app"}), patch("texo.macos.screen_capture_allowed", return_value=False), patch("ctypes.CDLL") as library, patch("subprocess.run") as run:
+            library.return_value.CGRequestScreenCaptureAccess.return_value = False
             with self.assertRaisesRegex(RuntimeError, "允许 Texo"):
                 capture_image()
         library.return_value.CGRequestScreenCaptureAccess.assert_called_once_with()
         run.assert_not_called()
+
+    def test_newly_granted_permission_continues_to_capture(self):
+        from subprocess import CompletedProcess
+        from texo.macos import capture_image
+
+        with patch.dict(os.environ, {"TEXO_APP_BUNDLE": "/Applications/Texo.app"}), patch("texo.macos.screen_capture_allowed", return_value=False), patch("texo.macos.ctypes.CDLL") as library, patch("subprocess.run", return_value=CompletedProcess([], 1, b"", b"")) as run:
+            library.return_value.CGRequestScreenCaptureAccess.return_value = True
+            self.assertIsNone(capture_image())
+        library.return_value.CGRequestScreenCaptureAccess.assert_called_once_with()
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][:3], ["/usr/sbin/screencapture", "-i", "-x"])
 
     def test_capture_reads_image_and_removes_temporary_file(self):
         from texo.macos import capture_image
@@ -200,17 +212,20 @@ class GlobalHotkeyTests(unittest.TestCase):
             function.argtypes, function.restype = arguments, result
         event = ptr()
         try:
-            self.assertEqual(carbon.CreateEvent(None, int.from_bytes(b"keyb", "big"), 5, 0, 0, ctypes.byref(event)), 0)
-            identifier = (uint * 2)(int.from_bytes(b"TEXO", "big"), 2)
-            self.assertEqual(carbon.SetEventParameter(event, int.from_bytes(b"----", "big"), int.from_bytes(b"hkid", "big"), ctypes.sizeof(identifier), identifier), 0)
-            target = ptr(carbon.GetApplicationEventTarget())
-            self.assertEqual(carbon.SetEventParameter(event, int.from_bytes(b"ptrg", "big"), int.from_bytes(b"etrg", "big"), ctypes.sizeof(target), ctypes.byref(target)), 0)
-            self.assertEqual(carbon.PostEventToQueue(carbon.GetMainEventQueue(), event, 1), 0)
-            deadline = time.monotonic() + 2
-            while not notifications and time.monotonic() < deadline:
-                root.update()
-                time.sleep(0.01)
-            self.assertEqual(notifications, ["panel"])
+            for event_id, expected in ((1, ["capture"]), (2, ["capture", "panel"])):
+                self.assertEqual(carbon.CreateEvent(None, int.from_bytes(b"keyb", "big"), 5, 0, 0, ctypes.byref(event)), 0)
+                identifier = (uint * 2)(int.from_bytes(b"TEXO", "big"), event_id)
+                self.assertEqual(carbon.SetEventParameter(event, int.from_bytes(b"----", "big"), int.from_bytes(b"hkid", "big"), ctypes.sizeof(identifier), identifier), 0)
+                target = ptr(carbon.GetApplicationEventTarget())
+                self.assertEqual(carbon.SetEventParameter(event, int.from_bytes(b"ptrg", "big"), int.from_bytes(b"etrg", "big"), ctypes.sizeof(target), ctypes.byref(target)), 0)
+                self.assertEqual(carbon.PostEventToQueue(carbon.GetMainEventQueue(), event, 1), 0)
+                deadline = time.monotonic() + 2
+                while len(notifications) < len(expected) and time.monotonic() < deadline:
+                    root.update()
+                    time.sleep(0.01)
+                self.assertEqual(notifications, expected)
+                carbon.ReleaseEvent(event)
+                event = ptr()
             hotkey.close()
             panel_hotkey.close()
             hotkey = GlobalHotkey(lambda: None)

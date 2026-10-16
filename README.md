@@ -130,7 +130,14 @@ capture, allow **Texo** in System Settings → Privacy & Security → Screen
 Recording, then fully quit and reopen it. The previous terminal's authorization
 does not authorize the application. The local app is ad-hoc signed; rebuilding
 the native launcher can change its code identity and require authorizing it
-again. Models and user images remain local.
+again. The switch can remain on even when the current signature or running
+process no longer has effective access. If capture is blocked, fully quit Texo,
+turn its Screen Recording switch off and back on, then reopen it. If this still
+fails, quit Texo and run `tccutil reset ScreenCapture com.chricheng.texo`, then
+reopen and authorize Texo again; this resets only Texo's permission record.
+Python backend updates only require restarting Texo and preserve the existing
+native app signature; rebuild when native app sources or the runtime paths
+change. Models and user images remain local.
 
 Choose an input in either the app or terminal-launched window:
 

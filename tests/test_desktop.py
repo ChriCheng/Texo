@@ -67,6 +67,24 @@ class NativeDesktopTests(unittest.TestCase):
             self.assertTrue(hotkey.close.called)
         self.assertEqual(self.window.hotkeys, [])
 
+    def test_permission_error_resets_capture_state_and_allows_retry(self):
+        self.panel.is_shown.return_value = True
+        with patch("texo.desktop.capture_image", side_effect=RuntimeError("截图权限未开启。")) as capture, patch("texo.desktop.Thread", side_effect=lambda target, daemon: SimpleNamespace(start=target)):
+            for _ in range(2):
+                self.window.screenshot()
+                self.assertTrue(self.window.busy)
+                self.assertTrue(self.window.interaction_active)
+                delay, start_worker = self.root.after.call_args.args
+                self.assertEqual(delay, 200)
+                start_worker()
+                self.window.poll()
+                self.assertFalse(self.window.busy)
+                self.assertFalse(self.window.interaction_active)
+                self.panel.set_status.assert_called_with("截图权限未开启。")
+                self.panel.show.assert_called()
+            self.assertEqual(capture.call_count, 2)
+        self.panel.set_result.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

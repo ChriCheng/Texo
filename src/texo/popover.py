@@ -21,6 +21,7 @@ _API = (
     ("TexoPopoverSetMode", [ctypes.c_int], None),
     ("TexoPopoverSetResultMode", [ctypes.c_int], None),
     ("TexoPopoverGetFormat", [], ctypes.c_int),
+    ("TexoPopoverSetFormat", [ctypes.c_int], None),
 )
 
 
@@ -114,7 +115,12 @@ class NativePopover:
 
     def get_format(self):
         _require_main_thread()
-        return self.library.TexoPopoverGetFormat() if self.installed else 0
+        return self.library.TexoPopoverGetFormat() if self.installed else 2
+
+    def set_format(self, format):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoPopoverSetFormat(format)
 
     def close(self):
         _require_main_thread()

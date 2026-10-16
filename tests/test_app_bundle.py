@@ -24,6 +24,7 @@ class AppBundleTests(unittest.TestCase):
             self.root / "scripts/macos/statusbar.m",
             self.root / "scripts/macos/popover.m",
             self.root / "assets/Texo.icns",
+            self.root / "assets/svg/status-icon.svg",
         ):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"fixture")

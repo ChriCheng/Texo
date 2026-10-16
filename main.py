@@ -42,7 +42,7 @@ def open_image(source):
         return Image.alpha_composite(background, image).convert("RGB")
 
 
-def recognize(image_path, model_dir=ROOT / "model", mode="formula"):
+def recognize(image_path, model_dir=ROOT / "model", mode="formula", progress=None):
     image = open_image(image_path)
     low, high = image.convert("L").getextrema()
     if low == high:
@@ -50,12 +50,16 @@ def recognize(image_path, model_dir=ROOT / "model", mode="formula"):
     if mode == "mixed":
         from texo.mixed import recognize_mixed
 
-        return recognize_mixed(image, lambda crop: recognize(crop, model_dir))
+        return recognize_mixed(image, lambda crop: recognize(crop, model_dir), progress=progress)
     if mode != "formula":
         raise ValueError(f"未知识别模式：{mode}")
     import torch
 
+    if progress:
+        progress(None, "正在准备公式模型…")
     model, tokenizer, processor = load_model(Path(model_dir).resolve())
+    if progress:
+        progress(None, "正在识别公式…")
     with torch.inference_mode():
         tokens = model.generate(pixel_values=processor(image).unsqueeze(0), do_sample=False)
     if tokens.shape[-1] >= model.generation_config.max_length:
@@ -63,6 +67,8 @@ def recognize(image_path, model_dir=ROOT / "model", mode="formula"):
     latex = normalize_latex(tokenizer.batch_decode(tokens, skip_special_tokens=True)[0])
     if not latex:
         raise ValueError("未识别出公式，请检查图片并重新裁剪。")
+    if progress:
+        progress(1, "公式识别完成")
     return latex
 
 
@@ -288,7 +294,7 @@ def main():
             from texo.desktop import NativeOCRWindow
 
             root.withdraw()
-            window = NativeOCRWindow(root, args.model, recognize, open_image, args.mode or "mixed")
+            window = NativeOCRWindow(root, args.model, recognize, open_image, args.mode)
             if not args.background:
                 window.show()
         else:

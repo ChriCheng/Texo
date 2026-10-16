@@ -5,6 +5,24 @@ import sys
 from threading import current_thread, main_thread
 
 
+_Callback = ctypes.CFUNCTYPE(None, ctypes.c_int)
+_API = (
+    ("TexoInstallStatusItem", [_Callback], ctypes.c_bool),
+    ("TexoRemoveStatusItem", [], None),
+    ("TexoSetLoginEnabled", [ctypes.c_bool], None),
+    ("TexoGetCopyFormat", [], ctypes.c_int),
+    ("TexoSetCopyFormat", [ctypes.c_int], None),
+    ("TexoGetRecognitionMode", [], ctypes.c_int),
+    ("TexoSetRecognitionMode", [ctypes.c_int], None),
+    ("TexoSetRecognitionProgress", [ctypes.c_double, ctypes.c_char_p], None),
+)
+
+
+def _require_main_thread():
+    if current_thread() is not main_thread():
+        raise RuntimeError("菜单栏图标必须在主线程操作。")
+
+
 class StatusBar:
     """Own the native menu item; callback must only enqueue events for Tk."""
 
@@ -14,47 +32,55 @@ class StatusBar:
             return False
         try:
             library = ctypes.CDLL(None)
-            for name in ("TexoInstallStatusItem", "TexoRemoveStatusItem", "TexoSetLoginEnabled", "TexoActivateApplication"):
+            for name, _arguments, _result in _API:
                 getattr(library, name)
         except (OSError, AttributeError):
             return False
         return True
 
     def __init__(self, callback):
-        if current_thread() is not main_thread():
-            raise RuntimeError("菜单栏图标必须在主线程创建。")
+        _require_main_thread()
         if not self.available():
             raise RuntimeError("菜单栏图标仅支持从 Texo.app 启动。")
         self.library = ctypes.CDLL(None)
-        callback_type = ctypes.CFUNCTYPE(None, ctypes.c_int)
-        self.library.TexoInstallStatusItem.argtypes = [callback_type]
-        self.library.TexoInstallStatusItem.restype = ctypes.c_bool
-        self.library.TexoRemoveStatusItem.argtypes = []
-        self.library.TexoRemoveStatusItem.restype = None
-        self.library.TexoSetLoginEnabled.argtypes = [ctypes.c_bool]
-        self.library.TexoSetLoginEnabled.restype = None
-        self.library.TexoActivateApplication.argtypes = []
-        self.library.TexoActivateApplication.restype = None
-        self.callback = callback_type(callback)
+        for name, arguments, result in _API:
+            function = getattr(self.library, name)
+            function.argtypes, function.restype = arguments, result
+        self.callback = _Callback(callback)
         self.installed = bool(self.library.TexoInstallStatusItem(self.callback))
         if not self.installed:
             raise RuntimeError("无法创建菜单栏图标，可能已存在 Texo 图标。")
 
     def set_login_enabled(self, enabled):
-        if current_thread() is not main_thread():
-            raise RuntimeError("菜单栏选项必须在主线程更新。")
+        _require_main_thread()
         if self.installed:
             self.library.TexoSetLoginEnabled(enabled)
 
-    def activate(self):
-        if current_thread() is not main_thread():
-            raise RuntimeError("识别窗口必须在主线程激活。")
+    def get_copy_format(self):
+        _require_main_thread()
+        return self.library.TexoGetCopyFormat() if self.installed else 2
+
+    def set_copy_format(self, format):
+        _require_main_thread()
         if self.installed:
-            self.library.TexoActivateApplication()
+            self.library.TexoSetCopyFormat(format)
+
+    def get_recognition_mode(self):
+        _require_main_thread()
+        return self.library.TexoGetRecognitionMode() if self.installed else 0
+
+    def set_recognition_mode(self, mode):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoSetRecognitionMode(mode)
+
+    def set_progress(self, value, label=""):
+        _require_main_thread()
+        if self.installed:
+            self.library.TexoSetRecognitionProgress(value, label.encode("utf-8"))
 
     def close(self):
-        if current_thread() is not main_thread():
-            raise RuntimeError("菜单栏图标必须在主线程释放。")
+        _require_main_thread()
         if self.installed:
             self.library.TexoRemoveStatusItem()
             self.installed = False

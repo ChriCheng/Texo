@@ -54,6 +54,20 @@ class NativePopoverTests(unittest.TestCase):
         self.assertEqual(ctypes.string_at(buffer, length), png)
         popover.close()
 
+    def test_mode_and_copy_format_can_be_synchronized_from_the_menu(self):
+        popover = NativePopover(lambda event: None)
+        self.library.TexoPopoverGetMode.return_value = 1
+        self.library.TexoPopoverGetFormat.return_value = 2
+        self.assertEqual(popover.get_mode(), 1)
+        self.assertEqual(popover.get_format(), 2)
+        popover.set_mode(1)
+        popover.set_format(0)
+        self.library.TexoPopoverSetMode.assert_called_once_with(1)
+        self.library.TexoPopoverSetFormat.assert_called_once_with(0)
+        popover.close()
+        popover.set_format(1)
+        self.library.TexoPopoverSetFormat.assert_called_once_with(0)
+
     def test_missing_launcher_symbols_explains_how_to_start(self):
         with patch("texo.popover.ctypes.CDLL", return_value=object()):
             self.assertFalse(NativePopover.available())
@@ -76,6 +90,24 @@ class NativePopoverTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("主线程", failures[0])
         self.library.TexoPopoverSetResult.assert_not_called()
+        popover.close()
+
+    def test_copy_format_changes_require_the_main_thread(self):
+        popover = NativePopover(lambda event: None)
+        failures = []
+
+        def change_format():
+            try:
+                popover.set_format(2)
+            except RuntimeError as error:
+                failures.append(str(error))
+
+        worker = Thread(target=change_format)
+        worker.start()
+        worker.join()
+        self.assertEqual(len(failures), 1)
+        self.assertIn("主线程", failures[0])
+        self.library.TexoPopoverSetFormat.assert_not_called()
         popover.close()
 
 

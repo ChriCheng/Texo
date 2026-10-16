@@ -19,7 +19,9 @@ class InferenceTests(unittest.TestCase):
     def test_real_formula_and_transparent_background(self):
         path = ROOT / "tests/fixtures/simple.png"
         expected = "x^{2}+y^{2}=z^{2}"
-        self.assertEqual("".join(recognize(path).split()), expected)
+        progress = []
+        self.assertEqual("".join(recognize(path, progress=lambda value, label: progress.append(value)).split()), expected)
+        self.assertEqual(progress, [None, None, 1])
         with Image.open(path) as source:
             pixel = source.getpixel((0, 0))
             self.assertEqual("".join(recognize(source).split()), expected)

@@ -106,13 +106,20 @@ open /Applications/Texo.app
 If `/Applications` is not writable, use `--output ~/Applications/Texo.app`.
 After installation, press **Command-Space**, search **Texo** and press Return.
 Opening it again shows the existing popover. Texo stays in the menu bar without
-a Dock icon. Click its menu-bar icon or press **Command-Shift-;** to show or hide
-the result. **Esc** in the popover or clicking outside it only hides the popover;
-recognition and the global shortcuts remain available. Right-click the icon and
+a Dock icon. Left-click or right-click its menu-bar icon to open the menu. Choose
+**显示／收起结果** or press **Command-Shift-;** to show or hide the result.
+**Esc** in the popover or clicking outside it only hides the popover;
+recognition and the global shortcuts remain available. Open the icon's menu and
 choose **退出 Texo**, or use **Command-Q** while Texo is active, to quit and release
 both shortcuts. Custom shortcut rebinding is not implemented yet.
 
-Right-click the icon and enable **登录时自动启动** to launch Texo in the background
+The normal menu-bar icon uses the original logo's four scan corners and
+outlined formula, adapting to light or dark menu bars. During recognition it
+changes to a pie-style activity indicator: completed phases advance the
+indicator, and phases without a known length rotate without claiming a precise
+percentage. Completion, failure and cancellation restore the normal icon.
+
+Open the icon's menu and enable **设定 → 登录时自动启动** to launch Texo in the background
 after logging into this Mac. The popover stays hidden until requested. This
 creates only Texo's per-user entry at
 `~/Library/LaunchAgents/com.chricheng.texo.login.plist`; it has no `KeepAlive`, so
@@ -147,8 +154,10 @@ Choose an input in either the app or terminal-launched window:
 - **截图识别 ⌘L** captures a region directly. Global **Command-L** triggers the
   same capture while another app is in front. Texo must remain running; this
   takes precedence over other apps' Command-L action. The popover hides before
-  region selection and opens with the captured image and recognition progress
-  afterwards. Quit Texo to release the shortcut.
+  region selection and stays hidden during recognition by default. When
+  recognition succeeds, Texo displays the captured image and result and copies
+  the result automatically. Use **Command-Shift-;** or the menu to inspect progress
+  while recognition is running. Quit Texo to release the shortcut.
   A shortcut registration conflict is shown in the status line.
 
 Press **Esc** to cancel a capture and keep the previous result. Temporary
@@ -158,17 +167,27 @@ in System Settings, then relaunch as prompted. Texo checks this
 permission before capture: a successful screenshot command alone can still
 return only desktop wallpaper when access to application content is denied.
 
-Choose the recognition mode before selecting an image or capturing:
+Choose the recognition mode in the menu before selecting an image or capturing.
+Texo.app remembers the mode and pure-formula copy format after restarting:
 
 - **中文与公式** keeps prose outside math, inserts `$...$` around inline formulas
-  and `$$...$$` around display formulas, and copies the complete Markdown. The
-  formula format menu is disabled for mixed results.
+  and `$$...$$` around display formulas, and copies the complete Markdown. If
+  the recognized result contains only one formula and no prose, Texo.app uses
+  the pure-formula copy format instead, including its default `$$...$$` wrapper.
+  The result panel's format selector is disabled for results that include mixed prose.
 - **公式** recognizes one formula. Select **LaTeX**, **$LaTeX$**, or **$$LaTeX$$**
-  in the format menu to copy plain source, inline math, or display math.
+  in the format menu to copy plain source, inline math, or display math. The
+  default pure-formula format in Texo.app is **$$LaTeX$$**.
 
-Click **复制结果** after checking or editing the result. Neither mode adds a
-trailing newline. Changing the mode affects the next recognition and preserves
-the current result's copy behavior. The CLI also omits the trailing newline.
+In Texo.app, file, clipboard and screenshot recognition stay hidden by default
+while OCR runs; the icon shows activity. Successful recognition displays the
+result and copies its format automatically. Use **Command-Shift-;** or the menu
+to inspect progress without waiting. Click **复制结果** again after checking or
+editing the result. Neither mode adds a trailing newline. Failure or cancellation
+leaves the existing clipboard intact.
+Changing the mode affects the next recognition and preserves the current
+result's copy behavior. The terminal-launched window uses its **复制结果** button;
+the CLI also omits the trailing newline.
 
 `launch_macos.command` still opens the terminal-launched desktop window; closing
 that window quits that instance. Menu-bar residency and login startup belong to

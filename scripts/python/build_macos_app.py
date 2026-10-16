@@ -28,7 +28,7 @@ def build(output):
     if not (ROOT / "model/model.safetensors").is_file():
         raise RuntimeError("公式模型未下载，请先运行 .venv/bin/python scripts/python/hf_hub.py pull --mixed")
     source, statusbar, popover, icon = ROOT / "scripts/macos/launcher.m", ROOT / "scripts/macos/statusbar.m", ROOT / "scripts/macos/popover.m", ROOT / "assets/Texo.icns"
-    for path in (source, statusbar, popover, icon):
+    for path in (source, statusbar, popover, icon, ROOT / "assets/svg/status-icon.svg"):
         if not path.is_file():
             raise RuntimeError(f"应用封装文件缺失：{path}。请更新项目后重试。")
 

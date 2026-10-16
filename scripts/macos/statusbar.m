@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#include <math.h>
 #include <stdbool.h>
 
 typedef void (*TexoStatusCallback)(int);
@@ -7,17 +8,25 @@ typedef void (*TexoStatusCallback)(int);
 @property(nonatomic, strong) NSStatusItem *item;
 @property(nonatomic, strong) NSMenu *menu;
 @property(nonatomic, strong) NSMenuItem *loginItem;
+@property(nonatomic, strong) NSArray<NSMenuItem *> *formatItems;
+@property(nonatomic, strong) NSArray<NSMenuItem *> *modeItems;
+@property(nonatomic, strong) NSImage *normalImage;
+@property(nonatomic, strong) NSTimer *progressTimer;
+@property(nonatomic, assign) double progress;
+@property(nonatomic, assign) double phase;
 @property(nonatomic, assign) TexoStatusCallback callback;
+- (NSMenuItem *)addItem:(NSString *)title tag:(NSInteger)tag to:(NSMenu *)menu key:(NSString *)key modifiers:(NSEventModifierFlags)modifiers;
+- (void)drawProgress;
 @end
 
 @implementation TexoStatusController
-- (void)clicked:(id)sender {
-    NSEvent *event = NSApp.currentEvent;
-    if (event.type == NSEventTypeRightMouseUp) {
-        [NSMenu popUpContextMenu:self.menu withEvent:event forView:self.item.button];
-    } else if (self.callback) {
-        self.callback(1);
-    }
+- (NSMenuItem *)addItem:(NSString *)title tag:(NSInteger)tag to:(NSMenu *)menu key:(NSString *)key modifiers:(NSEventModifierFlags)modifiers {
+    NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:title action:@selector(selected:) keyEquivalent:key];
+    item.tag = tag;
+    item.target = self;
+    item.keyEquivalentModifierMask = modifiers;
+    [menu addItem:item];
+    return item;
 }
 
 - (void)selected:(NSMenuItem *)sender {
@@ -25,16 +34,83 @@ typedef void (*TexoStatusCallback)(int);
         self.callback((int)sender.tag);
     }
 }
+- (void)drawProgress {
+    double progress = self.progress;
+    double phase = self.phase;
+    NSImage *image = [NSImage imageWithSize:NSMakeSize(18, 18) flipped:NO drawingHandler:^BOOL(NSRect __unused rect) {
+        [NSColor.blackColor set];
+        NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(2, 2, 14, 14)];
+        circle.lineWidth = 1.2;
+        [circle stroke];
+        if (progress >= 1) {
+            [circle fill];
+        } else if (progress > 0 || progress == -2) {
+            CGFloat start = progress == -2 ? 90 - phase : 90;
+            CGFloat end = start - (progress == -2 ? 75 : 360 * progress);
+            NSBezierPath *sector = [NSBezierPath bezierPath];
+            [sector moveToPoint:NSMakePoint(9, 9)];
+            [sector appendBezierPathWithArcWithCenter:NSMakePoint(9, 9) radius:7 startAngle:start endAngle:end clockwise:YES];
+            [sector closePath];
+            [sector fill];
+        }
+        return YES;
+    }];
+    image.template = YES;
+    self.item.button.image = image;
+}
+- (void)animateProgress:(NSTimer *)timer {
+    self.phase = fmod(self.phase + 24, 360);
+    [self drawProgress];
+}
 @end
 
 static TexoStatusController *controller;
+static NSString * const defaultTooltip = @"Texo · 点击显示菜单；⌘L 截图；⌘⇧; 显示／收起结果";
 
 __attribute__((visibility("default")))
 void *TexoStatusItemButton(void) {
+    return NSThread.isMainThread ? (__bridge void *)controller.item.button : NULL;
+}
+
+__attribute__((visibility("default")))
+int TexoGetCopyFormat(void) {
     if (!NSThread.isMainThread) {
-        return NULL;
+        return 2;
     }
-    return (__bridge void *)controller.item.button;
+    NSNumber *saved = [NSUserDefaults.standardUserDefaults objectForKey:@"TexoCopyFormat"];
+    NSInteger value = saved ? saved.integerValue : 2;
+    return value >= 0 && value <= 2 ? (int)value : 2;
+}
+
+__attribute__((visibility("default")))
+void TexoSetCopyFormat(int format) {
+    if (!NSThread.isMainThread || format < 0 || format > 2) {
+        return;
+    }
+    [NSUserDefaults.standardUserDefaults setInteger:format forKey:@"TexoCopyFormat"];
+    for (NSUInteger index = 0; index < controller.formatItems.count; index++) {
+        controller.formatItems[index].state = (int)index == format ? NSControlStateValueOn : NSControlStateValueOff;
+    }
+}
+
+__attribute__((visibility("default")))
+int TexoGetRecognitionMode(void) {
+    if (!NSThread.isMainThread) {
+        return 0;
+    }
+    NSInteger value = [NSUserDefaults.standardUserDefaults integerForKey:@"TexoRecognitionMode"];
+    return value == 1 ? 1 : 0;
+}
+
+__attribute__((visibility("default")))
+void TexoSetRecognitionMode(int mode) {
+    if (!NSThread.isMainThread || (mode != 0 && mode != 1)) {
+        return;
+    }
+    [NSUserDefaults.standardUserDefaults setInteger:mode forKey:@"TexoRecognitionMode"];
+    for (NSUInteger index = 0; index < controller.modeItems.count; index++) {
+        controller.modeItems[index].state = (int)index == mode ? NSControlStateValueOn : NSControlStateValueOff;
+    }
 }
 
 __attribute__((visibility("default")))
@@ -46,31 +122,54 @@ bool TexoInstallStatusItem(TexoStatusCallback callback) {
     controller = [[TexoStatusController alloc] init];
     controller.callback = callback;
     controller.item = [NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
-    NSStatusBarButton *button = controller.item.button;
-    NSImage *image = [NSImage imageWithSystemSymbolName:@"doc.text.viewfinder" accessibilityDescription:@"Texo"];
+    NSString *project = [NSBundle.mainBundle objectForInfoDictionaryKey:@"TexoProjectRoot"];
+    NSImage *image = project ? [[NSImage alloc] initWithContentsOfFile:[project stringByAppendingPathComponent:@"assets/svg/status-icon.svg"]] : nil;
+    if (!image) {
+        image = [NSImage imageWithSystemSymbolName:@"doc.text.viewfinder" accessibilityDescription:@"Texo"];
+    }
     image.template = YES;
     image.size = NSMakeSize(18, 18);
-    button.image = image;
-    button.toolTip = @"Texo · ⌘⇧; 显示／收起结果，⌘L 截图，右键显示菜单";
-    button.accessibilityLabel = @"Texo";
-    button.target = controller;
-    button.action = @selector(clicked:);
-    [button sendActionOn:NSEventMaskLeftMouseUp | NSEventMaskRightMouseUp];
+    controller.normalImage = image;
+    controller.item.button.image = image;
+    controller.item.button.toolTip = defaultTooltip;
+    controller.item.button.accessibilityLabel = @"Texo";
 
     controller.menu = [[NSMenu alloc] initWithTitle:@"Texo"];
-    NSArray<NSString *> *titles = @[@"显示／收起结果 ⌘⇧;", @"截图识别 ⌘L", @"识别剪贴板", @"登录时自动启动", @"退出 Texo"];
-    for (NSUInteger index = 0; index < titles.count; index++) {
-        if (index == 3 || index == 4) {
-            [controller.menu addItem:NSMenuItem.separatorItem];
-        }
-        NSMenuItem *item = [[NSMenuItem alloc] initWithTitle:titles[index] action:@selector(selected:) keyEquivalent:@""];
-        item.tag = index + 1;
-        item.target = controller;
-        [controller.menu addItem:item];
-        if (index == 3) {
-            controller.loginItem = item;
-        }
-    }
+    [controller addItem:@"截图识别" tag:2 to:controller.menu key:@"l" modifiers:NSEventModifierFlagCommand];
+    [controller addItem:@"选择图片" tag:6 to:controller.menu key:@"" modifiers:0];
+    [controller addItem:@"识别剪贴板" tag:3 to:controller.menu key:@"" modifiers:0];
+    [controller.menu addItem:NSMenuItem.separatorItem];
+    [controller addItem:@"显示／收起结果" tag:1 to:controller.menu key:@";" modifiers:NSEventModifierFlagCommand | NSEventModifierFlagShift];
+    [controller addItem:@"复制结果" tag:7 to:controller.menu key:@"" modifiers:0];
+    [controller.menu addItem:NSMenuItem.separatorItem];
+    NSMenu *settings = [[NSMenu alloc] initWithTitle:@"设定"];
+    NSMenuItem *settingsItem = [[NSMenuItem alloc] initWithTitle:@"设定" action:nil keyEquivalent:@""];
+    settingsItem.submenu = settings;
+    [controller.menu addItem:settingsItem];
+    NSMenu *modes = [[NSMenu alloc] initWithTitle:@"识别模式"];
+    NSMenuItem *modeItem = [[NSMenuItem alloc] initWithTitle:@"识别模式" action:nil keyEquivalent:@""];
+    modeItem.submenu = modes;
+    [settings addItem:modeItem];
+    controller.modeItems = @[
+        [controller addItem:@"中文与公式" tag:20 to:modes key:@"" modifiers:0],
+        [controller addItem:@"公式" tag:21 to:modes key:@"" modifiers:0]
+    ];
+    NSMenu *formats = [[NSMenu alloc] initWithTitle:@"公式复制格式"];
+    NSMenuItem *formatItem = [[NSMenuItem alloc] initWithTitle:@"公式复制格式" action:nil keyEquivalent:@""];
+    formatItem.submenu = formats;
+    [settings addItem:formatItem];
+    controller.formatItems = @[
+        [controller addItem:@"公式" tag:10 to:formats key:@"" modifiers:0],
+        [controller addItem:@"$公式$" tag:11 to:formats key:@"" modifiers:0],
+        [controller addItem:@"$$公式$$" tag:12 to:formats key:@"" modifiers:0]
+    ];
+    [settings addItem:NSMenuItem.separatorItem];
+    controller.loginItem = [controller addItem:@"登录时自动启动" tag:4 to:settings key:@"" modifiers:0];
+    [controller.menu addItem:NSMenuItem.separatorItem];
+    [controller addItem:@"退出 Texo" tag:5 to:controller.menu key:@"q" modifiers:NSEventModifierFlagCommand];
+    TexoSetCopyFormat(TexoGetCopyFormat());
+    TexoSetRecognitionMode(TexoGetRecognitionMode());
+    controller.item.menu = controller.menu;
     return true;
 }
 
@@ -82,9 +181,24 @@ void TexoSetLoginEnabled(bool enabled) {
 }
 
 __attribute__((visibility("default")))
-void TexoActivateApplication(void) {
-    if (NSThread.isMainThread) {
-        [NSApp activateIgnoringOtherApps:YES];
+void TexoSetRecognitionProgress(double value, const char *label) {
+    if (!NSThread.isMainThread || !controller) {
+        return;
+    }
+    [controller.progressTimer invalidate];
+    controller.progressTimer = nil;
+    if (value != -2 && (value < 0 || !isfinite(value))) {
+        controller.item.button.image = controller.normalImage;
+        controller.item.button.toolTip = defaultTooltip;
+        return;
+    }
+    controller.progress = value == -2 ? -2 : fmin(1, value);
+    NSString *text = label ? [NSString stringWithUTF8String:label] : nil;
+    controller.item.button.toolTip = text.length ? [@"Texo · " stringByAppendingString:text] : @"Texo · 正在识别";
+    [controller drawProgress];
+    if (value == -2) {
+        controller.progressTimer = [NSTimer timerWithTimeInterval:0.1 target:controller selector:@selector(animateProgress:) userInfo:nil repeats:YES];
+        [NSRunLoop.mainRunLoop addTimer:controller.progressTimer forMode:NSRunLoopCommonModes];
     }
 }
 
@@ -94,7 +208,9 @@ void TexoRemoveStatusItem(void) {
         return;
     }
     controller.callback = NULL;
-    controller.item.button.target = nil;
+    [controller.progressTimer invalidate];
+    controller.progressTimer = nil;
+    controller.item.menu = nil;
     [NSStatusBar.systemStatusBar removeStatusItem:controller.item];
     controller = nil;
 }

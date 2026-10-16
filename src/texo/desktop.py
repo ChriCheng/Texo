@@ -1,5 +1,6 @@
 from io import BytesIO
 from queue import Empty, Queue
+import re
 from threading import Thread
 import time
 
@@ -10,15 +11,24 @@ from texo.popover import NativePopover
 from texo.statusbar import StatusBar
 
 
+def _single_formula(text):
+    for delimiter in ("$$", "$"):
+        if text.startswith(delimiter) and text.endswith(delimiter):
+            latex = text[len(delimiter):-len(delimiter)].strip()
+            # Escaped dollars are formula text; unescaped dollars delimit other content.
+            if latex and not re.search(r"(?<!\\)(?:\\\\)*\$", latex):
+                return latex
+    return None
+
+
 class NativeOCRWindow:
     """Drive native UI on the main thread; acquisition and OCR stay in workers."""
 
-    def __init__(self, root, model_dir, recognize, open_image, mode="mixed"):
+    def __init__(self, root, model_dir, recognize, open_image, mode=None):
         self.root, self.model_dir = root, model_dir
         self.recognize, self.open_image = recognize, open_image
         self.events = Queue()
         self.busy = self.interaction_active = self.login_busy = False
-        self.result_mode = 0 if mode == "mixed" else 1
         self.hotkeys = []
         self.statusbar = StatusBar(self.events.put)
         try:
@@ -26,7 +36,9 @@ class NativeOCRWindow:
         except Exception:
             self.statusbar.close()
             raise
-        self.panel.set_mode(self.result_mode)
+        if mode is not None:
+            self.panel.set_mode(0 if mode == "mixed" else 1)
+        self.result_mode = self.panel.get_mode()
         self.panel.set_result_mode(self.result_mode)
         root.bind("<Destroy>", self.close, add="+")
         root.createcommand("::tk::mac::ReopenApplication", self.show)
@@ -63,6 +75,8 @@ class NativeOCRWindow:
     def set_busy(self, busy):
         self.busy = busy
         self.panel.set_busy(busy)
+        if not busy:
+            self.statusbar.set_progress(-1)
 
     def poll(self):
         actions = {1: self.toggle, 2: self.screenshot, 3: self.clipboard, 4: self.toggle_login, 5: self.root.destroy, 6: self.choose, 7: self.copy}
@@ -72,6 +86,12 @@ class NativeOCRWindow:
             except Empty:
                 break
             if isinstance(event, int):
+                if 10 <= event <= 12:
+                    self.panel.set_format(event - 10)
+                    continue
+                if event in (20, 21):
+                    self.panel.set_mode(event - 20)
+                    continue
                 if event in actions:
                     actions[event]()
                     if event == 5:
@@ -92,9 +112,20 @@ class NativeOCRWindow:
                 else:
                     self.start(value, label)
             elif kind == "result":
+                if not error and self.result_mode == 0 and value:
+                    formula = _single_formula(value.strip())
+                    if formula is not None:
+                        value, self.result_mode = formula, 1
+                self.panel.set_result_mode(self.result_mode)
                 self.panel.set_result(value or "")
                 self.panel.set_status(f"识别失败：{error}" if error else f"识别完成 · {detail:.2f} 秒，请核对后使用。")
                 self.set_busy(False)
+                if not error and self.copy(automatic=True):
+                    self.panel.set_status(f"识别完成 · {detail:.2f} 秒 · 已自动复制。")
+                self.show()
+            elif kind == "progress":
+                self.statusbar.set_progress(-2 if value is None else value, detail)
+                self.panel.set_status(detail)
             elif kind == "login":
                 self.login_busy = False
                 if error:
@@ -115,12 +146,10 @@ class NativeOCRWindow:
         if self.busy:
             return
         was_shown = self.panel.is_shown()
-        if capture:
-            self.panel.hide(immediately=True)
-        else:
-            self.show()
+        self.panel.hide(immediately=True)
         self.interaction_active = capture
         self.set_busy(True)
+        self.statusbar.set_progress(-2, "等待框选截图" if capture else "正在读取剪贴板…")
         self.panel.set_status("请框选文字或公式，Esc 取消。" if capture else "正在读取剪贴板…")
         events = self.events
 
@@ -137,21 +166,25 @@ class NativeOCRWindow:
             return
         from tkinter import filedialog
 
+        was_shown = self.panel.is_shown()
         self.panel.hide()
         self.interaction_active = True
         self.set_busy(True)
         path = ""
+        failed = False
         try:
             # A sheet attached to the hidden Tk root can reveal it and stall its timers.
             path = filedialog.askopenfilename(title="选择文字或公式图片", filetypes=[("图片", "*.png *.jpg *.jpeg *.webp *.bmp *.tif *.tiff"), ("所有文件", "*")])
         except Exception as error:
+            failed = True
             self.panel.set_status(f"无法选择图片：{error}")
         finally:
             self.interaction_active = False
             self.set_busy(False)
-            self.show()
         if path:
             self.start(path, "图片")
+        elif was_shown or failed:
+            self.show()
 
     def start(self, source, label):
         if self.busy:
@@ -169,30 +202,38 @@ class NativeOCRWindow:
         self.panel.set_image(png.getvalue())
         self.panel.set_result("")
         self.panel.set_status(f"正在识别 {label}…")
-        self.show()
         self.set_busy(True)
+        self.statusbar.set_progress(-2, f"正在识别 {label}…")
         events, recognize, model_dir = self.events, self.recognize, self.model_dir
         mode = "mixed" if self.result_mode == 0 else "formula"
 
         def worker():
             started = time.monotonic()
             try:
-                events.put(("result", recognize(image, model_dir, mode), time.monotonic() - started, None))
+                progress = lambda value, message: events.put(("progress", value, message, None))
+                events.put(("result", recognize(image, model_dir, mode, progress=progress), time.monotonic() - started, None))
             except Exception as error:
                 events.put(("result", None, 0, str(error)))
 
         Thread(target=worker, daemon=True).start()
 
-    def copy(self):
+    def copy(self, automatic=False):
         text = self.panel.get_result().strip()
         if self.result_mode == 1:
             text = normalize_latex(text)
             delimiter = ("", "$", "$$")[self.panel.get_format()]
             text = f"{delimiter}{text}{delimiter}" if text else ""
         if text:
-            self.root.clipboard_clear()
-            self.root.clipboard_append(text)
-            self.panel.set_status("结果已复制。")
+            try:
+                self.root.clipboard_clear()
+                self.root.clipboard_append(text)
+            except Exception as error:
+                self.panel.set_status(f"复制失败：{error}")
+                return False
+            if not automatic:
+                self.panel.set_status("结果已复制。")
+            return True
+        return False
 
     def toggle_login(self):
         if self.login_busy:

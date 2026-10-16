@@ -2,6 +2,10 @@
 #include <stdbool.h>
 
 extern void *TexoStatusItemButton(void);
+extern int TexoGetCopyFormat(void);
+extern void TexoSetCopyFormat(int format);
+extern int TexoGetRecognitionMode(void);
+extern void TexoSetRecognitionMode(int mode);
 typedef void (*TexoPopoverCallback)(int);
 
 @interface TexoPopoverView : NSView
@@ -109,6 +113,8 @@ typedef void (*TexoPopoverCallback)(int);
 
     self.mode = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 10, 150, 30) pullsDown:NO];
     [self.mode addItemsWithTitles:@[@"中文与公式", @"公式"]];
+    [self.mode selectItemAtIndex:TexoGetRecognitionMode()];
+    self.resultMode = (int)self.mode.indexOfSelectedItem;
     self.mode.target = self;
     self.mode.action = @selector(modeChanged:);
     self.mode.accessibilityLabel = @"识别模式";
@@ -116,8 +122,11 @@ typedef void (*TexoPopoverCallback)(int);
     [self label:@"复制格式" frame:NSMakeRect(184, 15, 64, 22) size:12];
     self.format = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(248, 10, 116, 30) pullsDown:NO];
     [self.format addItemsWithTitles:@[@"LaTeX", @"$LaTeX$", @"$$LaTeX$$"]];
+    [self.format selectItemAtIndex:TexoGetCopyFormat()];
+    self.format.target = self;
+    self.format.action = @selector(formatChanged:);
     self.format.accessibilityLabel = @"公式复制格式";
-    self.format.toolTip = @"中文与公式混排按 Markdown 原文复制；纯公式可选择数学标记。";
+    self.format.toolTip = @"纯公式按所选格式复制；中文与公式混排保留 Markdown 原文。可在菜单栏的设定中选择纯公式的默认格式。";
     [self.view addSubview:self.format];
     self.status = [self label:@"选择图片，或按 ⌘L 截图识别" frame:NSMakeRect(392, 15, 348, 22) size:12];
     self.status.lineBreakMode = NSLineBreakByTruncatingTail;
@@ -130,9 +139,13 @@ typedef void (*TexoPopoverCallback)(int);
     }
 }
 - (void)modeChanged:(id)sender {
+    TexoSetRecognitionMode((int)self.mode.indexOfSelectedItem);
     if (self.callback) {
         self.callback(8);
     }
+}
+- (void)formatChanged:(id)sender {
+    TexoSetCopyFormat((int)self.format.indexOfSelectedItem);
 }
 - (void)textDidChange:(NSNotification *)notification {
     [self refreshControls];
@@ -248,6 +261,7 @@ int TexoPopoverGetMode(void) {
 __attribute__((visibility("default")))
 void TexoPopoverSetMode(int mode) {
     if (NSThread.isMainThread && popoverController && (mode == 0 || mode == 1)) {
+        TexoSetRecognitionMode(mode);
         [popoverController.mode selectItemAtIndex:mode];
     }
 }
@@ -262,7 +276,15 @@ void TexoPopoverSetResultMode(int mode) {
 
 __attribute__((visibility("default")))
 int TexoPopoverGetFormat(void) {
-    return NSThread.isMainThread && popoverController ? (int)popoverController.format.indexOfSelectedItem : 0;
+    return NSThread.isMainThread && popoverController ? TexoGetCopyFormat() : 2;
+}
+
+__attribute__((visibility("default")))
+void TexoPopoverSetFormat(int format) {
+    if (NSThread.isMainThread && popoverController && format >= 0 && format <= 2) {
+        TexoSetCopyFormat(format);
+        [popoverController.format selectItemAtIndex:format];
+    }
 }
 
 __attribute__((visibility("default")))

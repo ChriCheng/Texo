@@ -10,6 +10,22 @@ from main import ROOT, recognize
 
 
 class MixedLayoutTests(unittest.TestCase):
+    def test_progress_tracks_regions_and_does_not_complete_on_failure(self):
+        from texo.mixed import recognize_mixed
+
+        image = Image.new("RGB", (200, 140), "white")
+        formulas = [{"type": "isolated", "box": [60, 40, 180, 80]}]
+        progress = []
+        with patch("texo.mixed.detect_formulas", return_value=formulas), patch("texo.mixed.recognize_text", return_value=[]):
+            result = recognize_mixed(image, lambda crop: "x^2", lambda value, label: progress.append((value, label)))
+            self.assertEqual(result, "$$x^2$$")
+            self.assertEqual([value for value, label in progress if value is not None], [1 / 3, 2 / 3, 1])
+            self.assertIn((None, "正在识别公式 1/1…"), progress)
+            progress.clear()
+            with self.assertRaisesRegex(ValueError, "failed"):
+                recognize_mixed(image, lambda crop: (_ for _ in ()).throw(ValueError("failed")), lambda value, label: progress.append((value, label)))
+            self.assertNotIn(1, [value for value, label in progress])
+
     def test_formula_is_inserted_between_text_in_one_vision_line(self):
         from texo.mixed import recognize_mixed
 

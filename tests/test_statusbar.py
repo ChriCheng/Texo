@@ -3,9 +3,8 @@ from pathlib import Path
 from queue import SimpleQueue
 import sys
 from threading import Thread
-from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 import weakref
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -15,12 +14,8 @@ from texo.statusbar import StatusBar
 class StatusBarTests(unittest.TestCase):
     def test_callback_is_retained_and_events_can_be_queued_until_close(self):
         native_callback = []
-        library = SimpleNamespace(
-            TexoInstallStatusItem=Mock(side_effect=lambda callback: native_callback.append(weakref.ref(callback)) or True),
-            TexoRemoveStatusItem=Mock(),
-            TexoSetLoginEnabled=Mock(),
-            TexoActivateApplication=Mock(),
-        )
+        library = Mock()
+        library.TexoInstallStatusItem.side_effect = lambda callback: native_callback.append(weakref.ref(callback)) or True
         events = SimpleQueue()
         with patch("texo.statusbar.sys.platform", "darwin"), patch("texo.statusbar.ctypes.CDLL", return_value=library):
             statusbar = StatusBar(events.put)
@@ -30,14 +25,36 @@ class StatusBarTests(unittest.TestCase):
             native_callback[0]()(3)
             self.assertEqual(events.get_nowait(), 3)
             statusbar.set_login_enabled(True)
-            statusbar.activate()
             statusbar.close()
             statusbar.close()
             statusbar.set_login_enabled(False)
-            statusbar.activate()
         library.TexoSetLoginEnabled.assert_called_once_with(True)
-        library.TexoActivateApplication.assert_called_once_with()
         library.TexoRemoveStatusItem.assert_called_once_with()
+
+    def test_settings_and_unicode_progress_cross_native_boundary(self):
+        library = Mock()
+        library.TexoInstallStatusItem.return_value = True
+        library.TexoGetCopyFormat.return_value = 2
+        library.TexoGetRecognitionMode.return_value = 0
+        with patch("texo.statusbar.sys.platform", "darwin"), patch("texo.statusbar.ctypes.CDLL", return_value=library):
+            statusbar = StatusBar(lambda event: None)
+            self.assertEqual(statusbar.get_copy_format(), 2)
+            self.assertEqual(statusbar.get_recognition_mode(), 0)
+            statusbar.set_copy_format(1)
+            statusbar.set_recognition_mode(1)
+            for value, label in ((0.25, "处理图片"), (-2, "识别公式"), (-1, "")):
+                statusbar.set_progress(value, label)
+            statusbar.close()
+            statusbar.set_progress(0.5, "已关闭")
+            statusbar.set_copy_format(0)
+            statusbar.set_recognition_mode(0)
+        library.TexoSetCopyFormat.assert_called_once_with(1)
+        library.TexoSetRecognitionMode.assert_called_once_with(1)
+        self.assertEqual(library.TexoSetRecognitionProgress.call_args_list, [
+            call(0.25, "处理图片".encode("utf-8")),
+            call(-2, "识别公式".encode("utf-8")),
+            call(-1, b""),
+        ])
 
     def test_unbundled_launcher_has_a_friendly_error(self):
         with patch("texo.statusbar.sys.platform", "darwin"), patch("texo.statusbar.ctypes.CDLL", return_value=object()):
